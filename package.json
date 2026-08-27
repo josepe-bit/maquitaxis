@@ -1,0 +1,32 @@
+{
+  "name": "maquitaxis-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Monorepo para la plataforma MaquiTaxis (App Móvil + Panel Web Admin + Supabase)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web:dev": "npm run dev --workspace=apps/web",
+    "web:build": "npm run build --workspace=apps/web",
+    "mobile:start": "npm run start --workspace=apps/mobile",
+    "mobile:android": "npm run android --workspace=apps/mobile",
+    "mobile:ios": "npm run ios --workspace=apps/mobile",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types:local": "npx supabase gen types typescript --local > packages/shared/src/database.types.ts",
+    "db:types:remote": "npx supabase gen types typescript --project-id maquitaxis-dev > packages/shared/src/database.types.ts",
+    "mcp:supabase": "npx -y @supabase/mcp-server-supabase",
+    "mcp:postgres": "npx -y @modelcontextprotocol/server-postgres postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4"
+  }
+}

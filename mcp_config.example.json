@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "supabase-official": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "YOUR_SUPABASE_ACCESS_TOKEN_HERE",
+        "SUPABASE_PROJECT_REF": "YOUR_SUPABASE_PROJECT_REF_HERE"
+      }
+    },
+    "supabase-postgres-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+      ]
+    }
+  }
+}

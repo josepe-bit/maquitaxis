@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "MaquiTaxis Conductor",
+    "slug": "maquitaxis-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.maquitaxis.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MaquiTaxis requiere tu ubicación para compartir la posición de tu taxi mientras estás en servicio.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MaquiTaxis requiere la ubicación en segundo plano para transmitir la posición de tu taxi durante la jornada de trabajo."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.maquitaxis.mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
