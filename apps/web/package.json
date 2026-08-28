@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "web:build": "npm run build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
