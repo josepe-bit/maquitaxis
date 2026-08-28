@@ -1,3 +1,4 @@
+S
 -- ====================================================================
 -- MAQUITAXIS - POLÍTICAS RLS PARA LA TABLA `terceros`
 -- Habilita operaciones de Registro (INSERT), Verificación (SELECT),
@@ -25,12 +26,13 @@ TO authenticated, anon
 USING (true);
 
 -- 4. Política INSERT: Permitir creación de nuevos terceros durante el registro
--- (Se usa WITH CHECK (true) para que la inserción enviada justo después de signUp no sea bloqueada si la sesión aún no ha transmitido el token del usuario)
 CREATE POLICY "Permitir insercion de terceros al registrarse"
 ON public.terceros
 FOR INSERT
 TO authenticated, anon
-WITH CHECK (true);
+WITH CHECK (
+  user_id IS NULL OR user_id = auth.uid()
+);
 
 -- 5. Política UPDATE: Permitir actualización de sus propios datos o por Administradores
 CREATE POLICY "Permitir actualizacion de terceros"
