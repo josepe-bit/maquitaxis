@@ -343,6 +343,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     setError(null);
 
+    // Diagnóstico temporal seguro
+    const urlRaw = import.meta.env.VITE_SUPABASE_URL;
+    const keyRaw = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    let urlOrigin = 'NO_DISPONIBLE';
+    try {
+      if (urlRaw) urlOrigin = new URL(urlRaw).origin;
+    } catch (_) {
+      urlOrigin = 'URL_INVALIDA';
+    }
+
+    console.log('[DIAGNOSTICO LOGIN] VITE_SUPABASE_URL existe:', Boolean(urlRaw));
+    console.log('[DIAGNOSTICO LOGIN] URL Origen:', urlOrigin);
+    console.log('[DIAGNOSTICO LOGIN] VITE_SUPABASE_ANON_KEY existe:', Boolean(keyRaw));
+    console.log('[DIAGNOSTICO LOGIN] ANON_KEY Longitud:', keyRaw ? keyRaw.length : 0);
+    console.log('[DIAGNOSTICO LOGIN] typeof supabaseClient:', typeof supabaseClient);
+
     try {
       // a) Autenticación inicial mediante Supabase Auth
       const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
@@ -377,6 +393,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
       return { success: true };
     } catch (err: any) {
+      console.error('[DIAGNOSTICO LOGIN CATCH]', {
+        error: err,
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      });
       const errMsg = err?.message || 'Error de conexión al iniciar sesión.';
       setError(errMsg);
       setLoading(false);
