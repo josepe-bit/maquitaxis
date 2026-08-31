@@ -1,12 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@maquitaxis/shared';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl) {
+  throw new Error('Falta la variable de entorno VITE_SUPABASE_URL');
+}
 
-// Exportación como `supabase` para mantener compatibilidad con servicios existentes
+if (!supabaseAnonKey) {
+  throw new Error('Falta la variable de entorno VITE_SUPABASE_ANON_KEY');
+}
+
+export const supabaseClient = createClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey
+);
+
 export const supabase = supabaseClient;
 
 export default supabaseClient;
+
