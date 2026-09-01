@@ -98,6 +98,7 @@ interface RawTerceroRow {
   is_service_client: boolean;
   is_driver: boolean;
   is_supplier: boolean;
+  access_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -186,6 +187,7 @@ export const adminService = {
       isServiceClient: t.is_service_client,
       isDriver: t.is_driver,
       isSupplier: t.is_supplier,
+      accessStatus: t.access_status as any || 'pending',
       createdAt: t.created_at,
       updatedAt: t.updated_at,
     };
