@@ -270,9 +270,9 @@ export const adminService = {
   },
 
   /**
-   * Cargar lista de Terceros con búsqueda y filtros de rol opcionales
+   * Cargar lista de Terceros con búsqueda y filtros opcionales de rol y estado (access_status)
    */
-  async fetchTerceros(searchQuery?: string, roleFilter?: string): Promise<Tercero[]> {
+  async fetchTerceros(searchQuery?: string, roleFilter?: string, statusFilter?: string): Promise<Tercero[]> {
     let query = supabase.from('terceros').select('*').order('name', { ascending: true });
 
     if (searchQuery && searchQuery.trim().length > 0) {
@@ -285,6 +285,10 @@ export const adminService = {
       if (roleFilter === 'driver') query = query.eq('is_driver', true);
       if (roleFilter === 'supplier') query = query.eq('is_supplier', true);
       if (roleFilter === 'client') query = query.eq('is_service_client', true);
+    }
+
+    if (statusFilter) {
+      query = query.eq('access_status', statusFilter);
     }
 
     const { data, error } = await query;

@@ -65,7 +65,7 @@ interface AuthContextType {
   error: string | null;
   login: (docNumber: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (input: RegisterInput) => Promise<{ success: boolean; message?: string }>;
-  approveUser: (terceroId: string) => Promise<{ success: boolean; message?: string }>;
+  approveUser: (terceroId: string, approvedRole?: UserRole) => Promise<{ success: boolean; message?: string }>;
   rejectUser: (terceroId: string) => Promise<{ success: boolean; message?: string }>;
   changePassword: (newPassword: string) => Promise<{ success: boolean; message?: string }>;
   resendVerificationEmail: (email: string) => Promise<{ success: boolean; message?: string }>;

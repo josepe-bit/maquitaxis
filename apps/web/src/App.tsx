@@ -20,6 +20,9 @@ import {
   X,
   CheckCircle2,
   AlertTriangle,
+  Calendar,
+  ChevronDown,
+  Menu,
 } from 'lucide-react';
 import { TaxiMap } from './components/TaxiMap';
 import { realtimeService } from './services/realtime';
@@ -61,22 +64,51 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const ALL_NAV_ITEMS: NavItem[] = [
-  { key: 'MAP_REALTIME', label: 'Mapa Tiempo Real', icon: <Map size={16} /> },
-  { key: 'SERVICIOS_APP', label: 'Servicios Suscripción', icon: <Building2 size={16} /> },
-  { key: 'CARRERAS', label: 'Despacho Carreras', icon: <Navigation size={16} /> },
-  { key: 'VEHICULOS', label: 'Gestión Taxis', icon: <Car size={16} /> },
-  { key: 'MARCAS', label: 'Marcas Vehículos', icon: <Tag size={16} /> },
-  { key: 'EVENTOS', label: 'Catálogo Eventos', icon: <Wrench size={16} /> },
-  { key: 'CONTROL', label: 'Control eventos', icon: <Wrench size={16} /> },
-  { key: 'MANTENIMIENTO', label: 'Mantenimiento Vehículo', icon: <Wrench size={16} /> },
-  { key: 'SSOCIAL', label: 'Seguridad Social', icon: <ShieldCheck size={16} /> },
-  { key: 'LIQUIDACION', label: 'Liquidación Conductor', icon: <DollarSign size={16} /> },
-  { key: 'TERCEROS', label: 'Terceros / Conductores', icon: <Users size={16} /> },
-  { key: 'PRODUCCION', label: 'Producción Diaria', icon: <DollarSign size={16} /> },
-  { key: 'HISTORY_ROUTES', label: 'Histórico Rutas', icon: <Navigation size={16} /> },
-];
+interface NavCategory {
+  id: string;
+  title: string;
+  items: NavItem[];
+}
 
+const NAV_CATEGORIES: NavCategory[] = [
+  {
+    id: 'operacion',
+    title: 'Operación',
+    items: [
+      { key: 'MAP_REALTIME', label: 'Mapa Tiempo Real', icon: <Map size={16} /> },
+      { key: 'CARRERAS', label: 'Despacho Carreras', icon: <Navigation size={16} /> },
+      { key: 'HISTORY_ROUTES', label: 'Histórico Rutas', icon: <Activity size={16} /> },
+    ],
+  },
+  {
+    id: 'flota',
+    title: 'Gestión Flota',
+    items: [
+      { key: 'VEHICULOS', label: 'Gestión Taxis', icon: <Car size={16} /> },
+      { key: 'MANTENIMIENTO', label: 'Mantenimiento Vehículo', icon: <Wrench size={16} /> },
+      { key: 'CONTROL', label: 'Control Eventos', icon: <ShieldCheck size={16} /> },
+      { key: 'EVENTOS', label: 'Catálogo Eventos', icon: <Calendar size={16} /> },
+      { key: 'MARCAS', label: 'Marcas Vehículos', icon: <Tag size={16} /> },
+    ],
+  },
+  {
+    id: 'finanzas',
+    title: 'Operación & Cuentas',
+    items: [
+      { key: 'PRODUCCION', label: 'Producción Diaria', icon: <DollarSign size={16} /> },
+      { key: 'LIQUIDACION', label: 'Liquidación Conductor', icon: <DollarSign size={16} /> },
+      { key: 'SSOCIAL', label: 'Seguridad Social', icon: <ShieldCheck size={16} /> },
+    ],
+  },
+  {
+    id: 'personas',
+    title: 'Personas & Servicios',
+    items: [
+      { key: 'TERCEROS', label: 'Terceros / Conductores', icon: <Users size={16} /> },
+      { key: 'SERVICIOS_APP', label: 'Servicios Suscripción', icon: <Building2 size={16} /> },
+    ],
+  },
+];
 
 const MainContentLayout: React.FC = () => {
   const { user, tercero, rol, permisos, loading, logout, hasPermission, changePassword } = useAuth();
@@ -84,6 +116,8 @@ const MainContentLayout: React.FC = () => {
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [selectedVehiculoId, setSelectedVehiculoId] = useState<string | undefined>(undefined);
   const [lastPositionEvent, setLastPositionEvent] = useState<string>('Esperando señal...');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [openCategoryDropdown, setOpenCategoryDropdown] = useState<string | null>(null);
 
   // Modal Cambiar Contraseña
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
@@ -214,7 +248,10 @@ const MainContentLayout: React.FC = () => {
   const inServiceTaxis = vehiculos.filter((v) => v.status === 'en_servicio').length;
   const availableTaxis = vehiculos.filter((v) => v.status === 'disponible').length;
 
-  const visibleNavItems = ALL_NAV_ITEMS.filter((item) => hasPermission(item.key));
+  const visibleCategories = NAV_CATEGORIES.map((cat) => ({
+    ...cat,
+    items: cat.items.filter((item) => hasPermission(item.key)),
+  })).filter((cat) => cat.items.length > 0);
 
   return (
     <div
@@ -256,31 +293,82 @@ const MainContentLayout: React.FC = () => {
             <span>MaquiTaxis</span>
           </div>
 
-          <nav style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
-            {visibleNavItems.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setActiveTab(item.key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.45rem 0.7rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: activeTab === item.key ? 'var(--primary)' : 'transparent',
-                  color: activeTab === item.key ? 'var(--bg-dark)' : 'var(--text-secondary)',
-                  fontWeight: activeTab === item.key ? '700' : '500',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
+          {/* Menú para Conductor Operativo (Simple y Directo) */}
+          {rol === 'CONDUCTOR' ? (
+            <nav style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+              {[
+                { key: 'MAP_REALTIME' as ActiveWebTab, label: 'Mapa Tiempo Real', icon: <Map size={18} /> },
+                { key: 'CARRERAS' as ActiveWebTab, label: 'Despacho Carreras', icon: <Navigation size={18} /> },
+                { key: 'PRODUCCION' as ActiveWebTab, label: 'Producción Diaria', icon: <DollarSign size={18} /> },
+              ].map((item) => {
+                const isActive = activeTab === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setActiveTab(item.key)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 0.9rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: isActive ? 'var(--primary)' : 'rgba(51, 65, 85, 0.4)',
+                      color: isActive ? 'var(--bg-dark)' : '#f8fafc',
+                      fontWeight: isActive ? '800' : '600',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          ) : (
+            /* Menú Categorizado para Nivel 1 (SuperAdmin) y Nivel 2 (Gestor Flota) */
+            <nav style={{ display: 'flex', gap: '0.75rem', flexShrink: 0, alignItems: 'center' }}>
+              {visibleCategories.map((cat) => {
+                const hasActiveTab = cat.items.some((i) => i.key === activeTab);
+
+                return (
+                  <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: 'rgba(15, 23, 42, 0.4)', padding: '0.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', color: hasActiveTab ? 'var(--primary)' : 'var(--text-secondary)', paddingLeft: '0.4rem', paddingRight: '0.2rem', letterSpacing: '0.04em' }}>
+                      {cat.title}
+                    </span>
+
+                    {cat.items.map((item) => {
+                      const isActive = activeTab === item.key;
+                      return (
+                        <button
+                          key={item.key}
+                          onClick={() => setActiveTab(item.key)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: isActive ? 'var(--primary)' : 'transparent',
+                            color: isActive ? 'var(--bg-dark)' : 'var(--text-secondary)',
+                            fontWeight: isActive ? '800' : '500',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {item.icon}
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </nav>
+          )}
         </div>
 
         {/* Panel de usuario y sesión */}

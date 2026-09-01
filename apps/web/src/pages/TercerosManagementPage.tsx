@@ -1,22 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { adminService, CreateTerceroInput, UpdateTerceroInput, TerceroRelations } from '../services/adminService';
 import { Tercero } from '@maquitaxis/shared';
-import { Users, Plus, Search, Filter, ShieldCheck, Edit3, Trash2, Eye, Phone, Mail, FileText, Calendar, CheckCircle2, Car, AlertTriangle, X } from 'lucide-react';
+import { useAuth, UserRole } from '../context/AuthContext';
+import { Users, Plus, Search, Filter, ShieldCheck, Edit3, Trash2, Eye, Phone, Mail, FileText, Calendar, CheckCircle2, Car, AlertTriangle, X, Clock, UserCheck, UserX, ShieldAlert } from 'lucide-react';
 
 export const TercerosManagementPage: React.FC = () => {
+  const { approveUser, rejectUser, rol: currentRole } = useAuth();
   const [terceros, setTerceros] = useState<Tercero[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [pendingCount, setPendingCount] = useState<number>(0);
   
   // Modals state
   const [showFormModal, setShowFormModal] = useState<boolean>(false);
   const [editingTercero, setEditingTercero] = useState<Tercero | null>(null);
   const [viewingTercero, setViewingTercero] = useState<Tercero | null>(null);
+  const [approvingTercero, setApprovingTercero] = useState<Tercero | null>(null);
+  const [approvedRoleSelect, setApprovedRoleSelect] = useState<UserRole>('CONDUCTOR');
   const [terceroRelations, setTerceroRelations] = useState<TerceroRelations | null>(null);
   
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Form Fields
   const [docType, setDocType] = useState('CC');
@@ -41,13 +48,18 @@ export const TercerosManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadTerceros();
-  }, [searchQuery, roleFilter]);
+  }, [searchQuery, roleFilter, statusFilter]);
 
   const loadTerceros = async () => {
     setLoading(true);
     try {
-      const list = await adminService.fetchTerceros(searchQuery, roleFilter);
+      const activeStatusFilter = statusFilter === 'all' ? undefined : statusFilter;
+      const list = await adminService.fetchTerceros(searchQuery, roleFilter, activeStatusFilter);
       setTerceros(list);
+
+      // Cargar conteo de pendientes para la pestaña
+      const pendingList = await adminService.fetchTerceros('', '', 'pending');
+      setPendingCount(pendingList.length);
     } finally {
       setLoading(false);
     }
@@ -167,6 +179,55 @@ export const TercerosManagementPage: React.FC = () => {
     }
   };
 
+  const handleOpenApproveModal = (t: Tercero) => {
+    let initialRole: UserRole = 'CONDUCTOR';
+    if (t.isServiceClient) initialRole = 'NIVEL_2';
+    if (t.isOwner) initialRole = 'NIVEL_1';
+
+    setApprovedRoleSelect(initialRole);
+    setApprovingTercero(t);
+    setActionFeedback(null);
+  };
+
+  const handleConfirmApproval = async () => {
+    if (!approvingTercero) return;
+    setSaving(true);
+    setActionFeedback(null);
+    try {
+      const res = await approveUser(approvingTercero.id, approvedRoleSelect);
+      if (res.success) {
+        setActionFeedback({ type: 'success', message: res.message || 'Usuario aprobado exitosamente.' });
+        setTimeout(() => {
+          setApprovingTercero(null);
+          loadTerceros();
+        }, 1200);
+      } else {
+        setActionFeedback({ type: 'error', message: res.message || 'Error al aprobar usuario.' });
+      }
+    } catch (err: any) {
+      setActionFeedback({ type: 'error', message: err?.message || 'Ocurrió un error inesperado.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRejectUser = async (t: Tercero) => {
+    if (!window.confirm(`¿Estás seguro de rechazar la solicitud de acceso para ${t.name}?`)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await rejectUser(t.id);
+      if (res.success) {
+        loadTerceros();
+      } else {
+        alert(res.message || 'Error al rechazar usuario.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteTercero = async (t: Tercero) => {
     if (!window.confirm(`¿Desea eliminar a ${t.name} (${t.docNumber})?`)) return;
 
@@ -192,6 +253,17 @@ export const TercerosManagementPage: React.FC = () => {
     return <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>{badges}</div>;
   };
 
+  const renderStatusBadge = (status?: string) => {
+    const st = status || 'pending';
+    if (st === 'approved') {
+      return <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid rgba(16, 185, 129, 0.3)' }}>APROBADO</span>;
+    }
+    if (st === 'rejected') {
+      return <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid rgba(239, 68, 68, 0.3)' }}>RECHAZADO</span>;
+    }
+    return <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid rgba(245, 158, 11, 0.3)' }}>PENDIENTE</span>;
+  };
+
   return (
     <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
       {/* Header */}
@@ -202,7 +274,7 @@ export const TercerosManagementPage: React.FC = () => {
             <span>Maestro de Terceros y Gestión de Roles</span>
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-            Administra propietarios, conductores, clientes y proveedores centralizados en public.terceros.
+            Administra propietarios, conductores, clientes y solicitudes de acceso centralizados en public.terceros.
           </p>
         </div>
 
@@ -224,6 +296,51 @@ export const TercerosManagementPage: React.FC = () => {
           <Plus size={18} />
           <span>Registrar Tercero</span>
         </button>
+      </div>
+
+      {/* Pestañas Principales por Estado de Acceso */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+        {[
+          { id: 'all', label: 'Todos los Terceros', count: null },
+          { id: 'pending', label: 'Solicitudes Pendientes', count: pendingCount, isWarning: pendingCount > 0 },
+          { id: 'approved', label: 'Aprobados', count: null },
+          { id: 'rejected', label: 'Rechazados', count: null },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.55rem 1rem',
+              borderRadius: '8px 8px 0 0',
+              border: 'none',
+              background: statusFilter === tab.id ? 'var(--bg-card)' : 'transparent',
+              color: statusFilter === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
+              fontWeight: statusFilter === tab.id ? '800' : '500',
+              borderBottom: statusFilter === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+            }}
+          >
+            <span>{tab.label}</span>
+            {tab.count !== null && (
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: '800',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '10px',
+                  backgroundColor: tab.isWarning ? '#f59e0b' : 'rgba(148, 163, 184, 0.2)',
+                  color: tab.isWarning ? '#0f172a' : 'var(--text-secondary)',
+                }}
+              >
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Bar: Search & Role Filters */}
@@ -254,7 +371,7 @@ export const TercerosManagementPage: React.FC = () => {
         {/* Filter Buttons */}
         <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-card)', padding: '0.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           {[
-            { id: '', label: 'Todos' },
+            { id: '', label: 'Todos los Roles' },
             { id: 'owner', label: 'Propietarios' },
             { id: 'driver', label: 'Conductores' },
             { id: 'supplier', label: 'Proveedores' },
@@ -285,7 +402,11 @@ export const TercerosManagementPage: React.FC = () => {
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando registros de terceros...</div>
         ) : terceros.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No se encontraron terceros con los criterios seleccionados.</div>
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            {statusFilter === 'pending'
+              ? 'No hay solicitudes de acceso pendientes de aprobación en este momento.'
+              : 'No se encontraron terceros con los criterios seleccionados.'}
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
@@ -293,8 +414,9 @@ export const TercerosManagementPage: React.FC = () => {
                 <th style={{ padding: '0.75rem 1rem' }}>Documento</th>
                 <th style={{ padding: '0.75rem 1rem' }}>Nombre / Razón Social</th>
                 <th style={{ padding: '0.75rem 1rem' }}>Contacto</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Roles Asignados</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Registro</th>
+                <th style={{ padding: '0.75rem 1rem' }}>Rol Solicitado / Asignado</th>
+                <th style={{ padding: '0.75rem 1rem' }}>Estado Acceso</th>
+                <th style={{ padding: '0.75rem 1rem' }}>Fecha Registro</th>
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
@@ -314,11 +436,60 @@ export const TercerosManagementPage: React.FC = () => {
                   <td style={{ padding: '0.75rem 1rem' }}>
                     {renderRoleBadges(t)}
                   </td>
+                  <td style={{ padding: '0.75rem 1rem' }}>
+                    {renderStatusBadge(t.accessStatus)}
+                  </td>
                   <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>
                   <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                      {currentRole === 'NIVEL_1' && (t.accessStatus === 'pending' || t.accessStatus === 'rejected') && (
+                        <button
+                          onClick={() => handleOpenApproveModal(t)}
+                          title="Aprobar Acceso de Usuario"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            padding: '0.4rem 0.7rem',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                          }}
+                        >
+                          <UserCheck size={15} />
+                          <span>Aprobar</span>
+                        </button>
+                      )}
+
+                      {currentRole === 'NIVEL_1' && t.accessStatus === 'pending' && (
+                        <button
+                          onClick={() => handleRejectUser(t)}
+                          title="Rechazar Solicitud"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            padding: '0.4rem 0.6rem',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                          }}
+                        >
+                          <UserX size={15} />
+                          <span>Rechazar</span>
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleOpenViewModal(t)}
                         title="Ver Ficha Completa"
@@ -643,6 +814,96 @@ export const TercerosManagementPage: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Aprobar Solicitud con Selección de Rol */}
+      {approvingTercero && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}>
+          <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '1.75rem', maxWidth: '480px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981' }}>
+                <UserCheck size={22} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: '#f8fafc' }}>
+                  Aprobar Solicitud de Acceso
+                </h3>
+              </div>
+              <button onClick={() => setApprovingTercero(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: '#0f172a', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+              <p style={{ margin: '0 0 0.4rem 0', color: '#f8fafc', fontWeight: '700' }}>{approvingTercero.name}</p>
+              <p style={{ margin: '0 0 0.25rem 0', color: '#94a3b8' }}>Doc: {approvingTercero.docType} {approvingTercero.docNumber}</p>
+              <p style={{ margin: '0 0 0.25rem 0', color: '#94a3b8' }}>Email: {approvingTercero.email || 'Sin correo'}</p>
+              <p style={{ margin: 0, color: '#94a3b8' }}>Teléfono: {approvingTercero.phone || 'Sin teléfono'}</p>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                Seleccionar Rol Aprobado Definitivo: <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={approvedRoleSelect}
+                onChange={(e) => setApprovedRoleSelect(e.target.value as UserRole)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem',
+                  borderRadius: '8px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #334155',
+                  color: '#f8fafc',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                }}
+              >
+                <option value="CONDUCTOR">🚖 Conductor Operativo (Acceso a Carreras, GPS y Producción)</option>
+                <option value="NIVEL_2">🏢 Gestor de Flota — Nivel 2 (Gestión de Taxis, Mantenimiento y Liquidación)</option>
+                <option value="NIVEL_1">🛡️ Administrador — Nivel 1 (SuperAdmin y Control Total de Plataforma)</option>
+              </select>
+              <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.5rem', lineHeight: '1.4' }}>
+                {approvedRoleSelect === 'CONDUCTOR' && '• Otorga acceso exclusivo a la aplicación móvil/web de conductor. No crea registro en la tabla de servicios.'}
+                {approvedRoleSelect === 'NIVEL_2' && '• Otorga acceso a la administración de la flota acotada por su servicio de suscripción.'}
+                {approvedRoleSelect === 'NIVEL_1' && '• Otorga acceso administrativo global a todos los módulos y aprobación de usuarios.'}
+              </p>
+            </div>
+
+            {actionFeedback && (
+              <div
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  marginBottom: '1rem',
+                  backgroundColor: actionFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  color: actionFeedback.type === 'success' ? '#10b981' : '#ef4444',
+                  border: actionFeedback.type === 'success' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+                }}
+              >
+                {actionFeedback.message}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setApprovingTercero(null)}
+                disabled={saving}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #334155', backgroundColor: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmApproval}
+                disabled={saving}
+                style={{ padding: '0.6rem 1.25rem', borderRadius: '8px', border: 'none', backgroundColor: '#10b981', color: '#0f172a', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                {saving ? 'Aprobando...' : 'Confirmar Aprobación'}
+              </button>
             </div>
           </div>
         </div>
