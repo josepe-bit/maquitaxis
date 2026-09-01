@@ -15,7 +15,7 @@ import {
   LogIn,
   UserPlus,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, UserRole } from '../context/AuthContext';
 
 type AuthMode = 'LOGIN' | 'REGISTER';
 
@@ -34,6 +34,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'LOGIN', onSuc
   const [loginPassword, setLoginPassword] = useState<string>('');
 
   // Formulario Registro
+  const [regRole, setRegRole] = useState<UserRole>('CONDUCTOR');
   const [regDocType, setRegDocType] = useState<string>('CC');
   const [regDocNumber, setRegDocNumber] = useState<string>('');
   const [regName, setRegName] = useState<string>('');
@@ -153,6 +154,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'LOGIN', onSuc
 
     try {
       const result = await register({
+        role: regRole,
         docType: regDocType,
         docNumber: regDocNumber.trim(),
         name: regName.trim(),
@@ -570,6 +572,37 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'LOGIN', onSuc
         {/* MODO 2: FORMULARIO DE REGISTRO */}
         {mode === 'REGISTER' && (
           <form onSubmit={handleRegisterSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Rol en la Aplicación */}
+            <div>
+              <label
+                htmlFor="regRole"
+                style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', marginBottom: '0.4rem' }}
+              >
+                Rol en la aplicación <span style={{ color: '#f59e0b' }}>*</span>
+              </label>
+              <select
+                id="regRole"
+                value={regRole}
+                onChange={(e) => setRegRole(e.target.value as UserRole)}
+                disabled={isSubmitting}
+                style={{
+                  width: '100%',
+                  padding: '0.7rem 0.875rem',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: '10px',
+                  color: '#f8fafc',
+                  fontSize: '0.875rem',
+                  outline: 'none',
+                  fontWeight: '600',
+                }}
+              >
+                <option value="CONDUCTOR">Conductor</option>
+                <option value="NIVEL_2">Gestor de flota — Nivel 2</option>
+                <option value="NIVEL_1">Administrador — Nivel 1</option>
+              </select>
+            </div>
+
             {/* Tipo y Número de Documento */}
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <div style={{ width: '100px' }}>

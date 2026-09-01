@@ -27,6 +27,8 @@ export type ProductionStatus = 'trabajo' | 'pico_y_placa' | 'taller' | 'descanso
  */
 export type CarreraStatus = 'pendiente' | 'asignado' | 'aceptado' | 'en_curso' | 'completado' | 'cancelado';
 
+export type AccessStatus = 'pending' | 'approved' | 'rejected';
+
 /**
  * Entidad Terceros (Personas, Empresas, Conductores, Proveedores, Propietarios)
  */
@@ -49,6 +51,7 @@ export interface Tercero {
   isServiceClient: boolean; // Empresa/Servicio contratante de la app
   isDriver: boolean; // Conductor
   isSupplier: boolean; // Proveedor de repuestos/mantenimiento
+  accessStatus?: AccessStatus; // Estado de autorización de acceso a la app
   createdAt: string;
   updatedAt: string;
 }

@@ -30,6 +30,7 @@ export interface TerceroData {
   is_service_client: boolean;
   is_driver: boolean;
   is_supplier: boolean;
+  access_status?: 'pending' | 'approved' | 'rejected';
   created_at?: string;
   updated_at?: string;
 }
@@ -51,6 +52,7 @@ export interface RegisterInput {
   phone?: string;
   email: string;
   password: string;
+  role: UserRole;
 }
 
 interface AuthContextType {
@@ -63,6 +65,8 @@ interface AuthContextType {
   error: string | null;
   login: (docNumber: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (input: RegisterInput) => Promise<{ success: boolean; message?: string }>;
+  approveUser: (terceroId: string) => Promise<{ success: boolean; message?: string }>;
+  rejectUser: (terceroId: string) => Promise<{ success: boolean; message?: string }>;
   changePassword: (newPassword: string) => Promise<{ success: boolean; message?: string }>;
   resendVerificationEmail: (email: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
@@ -143,7 +147,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'CONDUCTOR':
         return {
           canAccessAll: false,
-          allowedTabs: ['MAP_REALTIME', 'PRODUCCION'],
+          allowedTabs: ['MAP_REALTIME', 'PRODUCCION', 'CARRERAS'],
           canManageVehiculos: false,
           canManageTerceros: false,
           canManageServicios: false,
@@ -152,33 +156,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           canViewProduccion: true,
           canViewHistory: false,
           canViewMap: true,
-          canManageCarreras: false,
+          canManageCarreras: true,
         };
       default:
         return DEFAULT_PERMISSIONS;
     }
   };
 
-  // Cargar perfil completo y validar rol tras autenticación
+  // Cargar Perfil de Tercero y Nivel de Servicio
   const loadUserProfileAndRole = async (
     authUser: User,
     docNumberInput?: string
   ): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     try {
-      // 1. Consultar la tabla terceros (por user_id o doc_number)
-      let query = supabaseClient.from('terceros').select('*');
-      if (docNumberInput && docNumberInput.trim() !== '') {
-        query = query.eq('doc_number', docNumberInput.trim());
-      } else {
-        query = query.eq('user_id', authUser.id);
+      // 1. Validar si el correo del usuario fue verificado en Supabase Auth
+      if (!authUser.email_confirmed_at) {
+        await supabaseClient.auth.signOut();
+        return {
+          success: false,
+          message: 'Debes confirmar tu correo electrónico antes de ingresar.',
+        };
       }
 
-      const { data: terceroRow, error: terceroErr } = await query.maybeSingle();
+      // 2. Consultar la tabla terceros por user_id
+      let { data: terceroRow, error: terceroErr } = await supabaseClient
+        .from('terceros')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
 
       if (terceroErr) {
-        console.error('Error al consultar terceros:', terceroErr);
-        await supabaseClient.auth.signOut();
-        return { success: false, message: 'Error de base de datos al validar la cuenta del tercero.' };
+        console.error('Error al consultar terceros por user_id:', terceroErr);
+      }
+
+      // Si el tercero no existe aún para este authUser.id, invocar setup_user_profile_on_first_login con la metadata del registro
+      if (!terceroRow) {
+        const meta = authUser.user_metadata || {};
+        const docNum = meta.docNumber || docNumberInput || '';
+        const docType = meta.docType || 'CC';
+        const name = meta.name || authUser.email?.split('@')[0] || 'Usuario';
+        const phone = meta.phone || '';
+        const role = meta.role || 'CONDUCTOR';
+
+        if (docNum) {
+          const { error: rpcErr } = await supabaseClient.rpc('setup_user_profile_on_first_login', {
+            p_doc_type: docType,
+            p_doc_number: docNum,
+            p_name: name,
+            p_phone: phone,
+            p_role: role,
+          });
+
+          if (rpcErr) {
+            console.error('Error en setup_user_profile_on_first_login:', rpcErr);
+            await supabaseClient.auth.signOut();
+            return { success: false, message: rpcErr.message };
+          }
+
+          // Consultar nuevamente el tercero recién creado/vinculado
+          const { data: newlyCreated } = await supabaseClient
+            .from('terceros')
+            .select('*')
+            .eq('user_id', authUser.id)
+            .maybeSingle();
+
+          terceroRow = newlyCreated;
+        }
       }
 
       if (!terceroRow) {
@@ -198,14 +241,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
       }
 
-      // Vincular user_id en terceros si no está vinculado aún
-      if (!terceroRow.user_id) {
-        await supabaseClient.from('terceros').update({ user_id: authUser.id }).eq('id', terceroRow.id);
-        terceroRow.user_id = authUser.id;
+      // 3. Validar Estado de Aprobación de Acceso (access_status)
+      const currentAccessStatus = terceroRow.access_status || 'pending';
+
+      if (currentAccessStatus === 'pending') {
+        await supabaseClient.auth.signOut();
+        return {
+          success: false,
+          message: 'Tu cuenta está pendiente de aprobación por el administrador.',
+        };
       }
 
-      // 2. Consultar la tabla servicios vinculados al tercero (solo servicios activos)
-      let { data: servicioRow, error: servicioErr } = await supabaseClient
+      if (currentAccessStatus === 'rejected') {
+        await supabaseClient.auth.signOut();
+        return {
+          success: false,
+          message: 'Tu acceso a MaquiTaxis no está autorizado. Comunícate con el administrador.',
+        };
+      }
+
+      // 4. Consultar la tabla servicios vinculados al tercero (solo servicios activos)
+      const { data: servicioRow, error: servicioErr } = await supabaseClient
         .from('servicios')
         .select('*')
         .eq('tercero_id', terceroRow.id)
@@ -217,55 +273,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('Error al consultar servicios:', servicioErr);
       }
 
-      // Si no existe un servicio activo registrado para este tercero (o si la tabla servicios no tiene registros):
-      // Permitir la creación automática del registro de servicio para otorgar el nivel correspondiente y evitar el bloqueo.
-      if (!servicioRow) {
-        const { count } = await supabaseClient
-          .from('servicios')
-          .select('*', { count: 'exact', head: true });
-
-        // Si la tabla servicios no tiene registros en la base de datos (count === 0), asignamos Nivel 1 (Administrador)
-        // De lo contrario, si es una nueva empresa / gestor, asignamos Nivel 2 (Gestor de Flota)
-        const assignedLevel = (!count || count === 0) ? 1 : 2;
-        const serviceName = assignedLevel === 1
-          ? `Servicio Administrador - ${terceroRow.name}`
-          : `Empresa de Afiliación - ${terceroRow.name}`;
-
-        const today = new Date().toISOString().split('T')[0];
-
-        const { data: newServicio, error: newServicioErr } = await supabaseClient
-          .from('servicios')
-          .insert({
-            name: serviceName,
-            tercero_id: terceroRow.id,
-            status: 'activo',
-            level: assignedLevel,
-            start_date: today,
-          })
-          .select()
-          .single();
-
-        if (!newServicioErr && newServicio) {
-          servicioRow = newServicio;
-        } else {
-          console.error('Error al auto-crear registro de servicio:', newServicioErr);
-        }
-      }
-
       let determinedRole: UserRole | null = null;
       let activeService: ServicioData | null = null;
 
-      // 3. Determinación de Nivel y Rol
+      // 5. Determinación estricta de Nivel y Rol
       if (servicioRow) {
         activeService = servicioRow as ServicioData;
         if (servicioRow.level === 1) {
-          determinedRole = 'NIVEL_1'; // Administrador / Dueño total
+          determinedRole = 'NIVEL_1'; // Administrador / SuperAdmin
         } else if (servicioRow.level === 2) {
-          determinedRole = 'NIVEL_2'; // Gestor de Flota / Empresa de Afiliación
+          determinedRole = 'NIVEL_2'; // Gestor de Flota / Empresa
         }
       }
 
-      // 4. Validación de Conductor si no tiene servicio activo de Nivel 1 o 2
+      // Si no posee servicio activo pero tiene is_driver = true, es Conductor
       if (!determinedRole && terceroRow.is_driver) {
         determinedRole = 'CONDUCTOR';
       }
@@ -275,7 +296,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await supabaseClient.auth.signOut();
         return {
           success: false,
-          message: 'Acceso denegado: El usuario no posee un contrato de servicio activo ni rol de conductor asignado.',
+          message: 'Acceso denegado: El usuario no posee un servicio activo ni rol de conductor asignado.',
         };
       }
 
@@ -285,13 +306,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setServicio(activeService);
       setRol(determinedRole);
       setPermisos(calculatePermissions(determinedRole));
-      setError(null);
 
       return { success: true, role: determinedRole };
     } catch (err: any) {
-      console.error('Excepción al cargar perfil:', err);
+      console.error('Error inesperado al cargar perfil:', err);
       await supabaseClient.auth.signOut();
-      return { success: false, message: err?.message || 'Ocurrió un error inesperado al procesar el login.' };
+      return {
+        success: false,
+        message: err?.message || 'Ocurrió un error inesperado al validar el perfil de usuario.',
+      };
     }
   };
 
@@ -343,22 +366,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     setError(null);
 
-    // Diagnóstico temporal seguro
-    const urlRaw = import.meta.env.VITE_SUPABASE_URL;
-    const keyRaw = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    let urlOrigin = 'NO_DISPONIBLE';
-    try {
-      if (urlRaw) urlOrigin = new URL(urlRaw).origin;
-    } catch (_) {
-      urlOrigin = 'URL_INVALIDA';
-    }
-
-    console.log('[DIAGNOSTICO LOGIN] VITE_SUPABASE_URL existe:', Boolean(urlRaw));
-    console.log('[DIAGNOSTICO LOGIN] URL Origen:', urlOrigin);
-    console.log('[DIAGNOSTICO LOGIN] VITE_SUPABASE_ANON_KEY existe:', Boolean(keyRaw));
-    console.log('[DIAGNOSTICO LOGIN] ANON_KEY Longitud:', keyRaw ? keyRaw.length : 0);
-    console.log('[DIAGNOSTICO LOGIN] typeof supabaseClient:', typeof supabaseClient);
-
     try {
       // a) Autenticación inicial mediante Supabase Auth
       const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
@@ -393,12 +400,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
       return { success: true };
     } catch (err: any) {
-      console.error('[DIAGNOSTICO LOGIN CATCH]', {
-        error: err,
-        name: err?.name,
-        message: err?.message,
-        stack: err?.stack,
-      });
       const errMsg = err?.message || 'Error de conexión al iniciar sesión.';
       setError(errMsg);
       setLoading(false);
@@ -406,7 +407,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Función de Registro de Nuevos Terceros y Usuarios Auth
+  // Función de Registro de Nuevos Terceros y Usuarios Auth (Solo guarda metadata)
   const register = async (input: RegisterInput) => {
     setLoading(true);
     setError(null);
@@ -415,22 +416,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const docNumClean = input.docNumber.trim();
       const emailClean = input.email.trim();
 
-      // 1. Verificación previa en la tabla terceros:
-      // Si el documento YA está ingresado en terceros, se ACEPTA y se vincula el user_id (no se rechaza).
-      const { data: existingDoc, error: docCheckErr } = await supabaseClient
-        .from('terceros')
-        .select('*')
-        .eq('doc_number', docNumClean)
-        .maybeSingle();
-
-      if (docCheckErr) {
-        console.error('Error al verificar documento en terceros:', docCheckErr);
-      }
-
-      // 2. Crear usuario en Supabase Auth
+      // Crear usuario en Supabase Auth guardando la solicitud en user_metadata
       const { data: authData, error: authErr } = await supabaseClient.auth.signUp({
         email: emailClean,
         password: input.password,
+        options: {
+          data: {
+            role: input.role,
+            docNumber: docNumClean,
+            name: input.name.trim(),
+            phone: input.phone?.trim() || '',
+            docType: input.docType || 'CC',
+          },
+        },
       });
 
       if (authErr || !authData.user) {
@@ -440,97 +438,69 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { success: false, message: msg };
       }
 
-      let terceroId: string;
-
-      if (existingDoc) {
-        // Aceptamos el tercero existente y actualizamos su user_id, email y teléfono
-        const { data: updatedRows, error: updateErr } = await supabaseClient
-          .from('terceros')
-          .update({
-            user_id: authData.user.id,
-            email: emailClean,
-            phone: input.phone?.trim() || existingDoc.phone,
-            name: input.name.trim() || existingDoc.name,
-            doc_type: input.docType || existingDoc.doc_type || 'CC',
-          })
-          .eq('id', existingDoc.id)
-          .select();
-
-        if (updateErr) {
-          console.error('Error al vincular tercero existente:', updateErr);
-          const msg = `Cuenta de Auth creada, pero no se pudo actualizar el tercero existente: ${updateErr.message}`;
-          setError(msg);
-          setLoading(false);
-          return { success: false, message: msg };
-        }
-
-        if (updatedRows && updatedRows.length > 0) {
-          terceroId = updatedRows[0].id;
-        } else {
-          terceroId = existingDoc.id;
-        }
-      } else {
-        // Si no existe el documento, creamos el nuevo tercero
-        const { data: newTercero, error: insertErr } = await supabaseClient
-          .from('terceros')
-          .insert({
-            doc_type: input.docType || 'CC',
-            doc_number: docNumClean,
-            name: input.name.trim(),
-            phone: input.phone?.trim() || null,
-            email: emailClean,
-            user_id: authData.user.id,
-            is_owner: false,
-            is_service_client: false,
-            is_driver: true,
-            is_supplier: false,
-          })
-          .select()
-          .single();
-
-        if (insertErr) {
-          console.error('Error al insertar registro en terceros:', insertErr);
-          const msg = `Cuenta de Auth creada, pero ocurrió un problema al guardar los datos en terceros: ${insertErr.message}`;
-          setError(msg);
-          setLoading(false);
-          return { success: false, message: msg };
-        }
-        terceroId = newTercero.id;
-      }
-
-      // 3. Regla de Servicio Inicial:
-      // Si NO hay registros en la tabla de servicios, el primer usuario creado debe crear el registro en la tabla de servicios con nivel 1.
-      // De ahí en adelante ya no se crean más registros en la tabla servicios durante el registro.
-      const { count: totalServicios } = await supabaseClient
-        .from('servicios')
-        .select('*', { count: 'exact', head: true });
-
-      if (totalServicios === 0 || totalServicios === null) {
-        const { error: servicioInsertErr } = await supabaseClient
-          .from('servicios')
-          .insert({
-            name: `Suscripción Administrador - ${input.name.trim()}`,
-            tercero_id: terceroId,
-            level: 1,
-            status: 'activo',
-            start_date: new Date().toISOString().split('T')[0],
-          });
-
-        if (servicioInsertErr) {
-          console.error('Error al crear servicio Nivel 1 inicial:', servicioInsertErr);
-        }
-      }
-
       setLoading(false);
       return {
         success: true,
-        message: '¡Registro completado con éxito! Ahora puedes iniciar sesión con tus credenciales.',
+        message: '¡Registro completado con éxito! Por favor confirma tu correo electrónico y espera la aprobación del Administrador.',
       };
     } catch (err: any) {
       const msg = err?.message || 'Error inesperado durante el registro.';
       setError(msg);
       setLoading(false);
       return { success: false, message: msg };
+    }
+  };
+
+  // Aprobar acceso de un usuario (Solo Administrador Nivel 1)
+  const approveUser = async (terceroId: string, approvedRole: UserRole = 'CONDUCTOR'): Promise<{ success: boolean; message?: string }> => {
+    try {
+      if (rol !== 'NIVEL_1') {
+        return { success: false, message: 'Solo un Administrador Nivel 1 puede aprobar usuarios.' };
+      }
+
+      const { data: rpcData, error: rpcErr } = await supabaseClient
+        .rpc('approve_user_by_admin', {
+          p_target_tercero_id: terceroId,
+          p_approved_role: approvedRole,
+        });
+
+      if (rpcErr) {
+        console.error('Error al aprobar usuario via RPC:', rpcErr);
+        return { success: false, message: rpcErr.message };
+      }
+
+      return { success: true, message: (rpcData as any)?.message || 'Usuario aprobado exitosamente.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Error al aprobar usuario.' };
+    }
+  };
+
+  // Rechazar / Desactivar acceso de un usuario (Solo Administrador Nivel 1)
+  const rejectUser = async (terceroId: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      if (rol !== 'NIVEL_1') {
+        return { success: false, message: 'Solo un Administrador Nivel 1 puede rechazar o desactivar usuarios.' };
+      }
+
+      const { error: updateErr } = await supabaseClient
+        .from('terceros')
+        .update({ access_status: 'rejected' })
+        .eq('id', terceroId);
+
+      if (updateErr) {
+        console.error('Error al rechazar usuario:', updateErr);
+        return { success: false, message: updateErr.message };
+      }
+
+      // Si el tercero tiene un servicio registrado, inactivarlo
+      await supabaseClient
+        .from('servicios')
+        .update({ status: 'inactivo' })
+        .eq('tercero_id', terceroId);
+
+      return { success: true, message: 'Acceso de usuario desactivado.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Error al rechazar usuario.' };
     }
   };
 
@@ -642,6 +612,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         error,
         login,
         register,
+        approveUser,
+        rejectUser,
         changePassword,
         resendVerificationEmail,
         logout,

@@ -28,6 +28,7 @@ export interface Database {
           is_service_client: boolean
           is_driver: boolean
           is_supplier: boolean
+          access_status?: string
           created_at: string
           updated_at: string
         }
@@ -49,6 +50,7 @@ export interface Database {
           is_service_client?: boolean
           is_driver?: boolean
           is_supplier?: boolean
+          access_status?: string
           created_at?: string
           updated_at?: string
         }
@@ -70,6 +72,7 @@ export interface Database {
           is_service_client?: boolean
           is_driver?: boolean
           is_supplier?: boolean
+          access_status?: string
           created_at?: string
           updated_at?: string
         }
@@ -784,6 +787,27 @@ export interface Database {
       get_user_service_level: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      get_user_servicio_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string | null
+      }
+      setup_user_profile_on_first_login: {
+        Args: {
+          p_doc_type: string
+          p_doc_number: string
+          p_name: string
+          p_phone: string
+          p_role: string
+        }
+        Returns: Json
+      }
+      approve_user_by_admin: {
+        Args: {
+          p_target_tercero_id: string
+          p_approved_role: string
+        }
+        Returns: Json
       }
     }
     Enums: {
