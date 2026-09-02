@@ -326,6 +326,8 @@ export interface Database {
           id: string
           vehiculo_id: string
           date: string
+          shift: 'dia' | 'noche'
+          driver_id: string | null
           amount: number
           deduction: number
           status: 'trabajo' | 'pico_y_placa' | 'taller' | 'descanso'
@@ -338,6 +340,8 @@ export interface Database {
           id?: string
           vehiculo_id: string
           date?: string
+          shift?: 'dia' | 'noche'
+          driver_id?: string | null
           amount?: number
           deduction?: number
           status?: 'trabajo' | 'pico_y_placa' | 'taller' | 'descanso'
@@ -350,6 +354,8 @@ export interface Database {
           id?: string
           vehiculo_id?: string
           date?: string
+          shift?: 'dia' | 'noche'
+          driver_id?: string | null
           amount?: number
           deduction?: number
           status?: 'trabajo' | 'pico_y_placa' | 'taller' | 'descanso'
@@ -364,9 +370,68 @@ export interface Database {
             columns: ["vehiculo_id"]
             referencedRelation: "vehiculos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produccion_driver_id_fkey"
+            columns: ["driver_id"]
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
           }
         ]
       }
+      vehiculo_turnos: {
+        Row: {
+          id: string
+          vehiculo_id: string
+          shift: 'dia' | 'noche'
+          driver_id: string | null
+          daily_fee: number
+          savings_amount: number
+          start_time: string | null
+          end_time: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          vehiculo_id: string
+          shift: 'dia' | 'noche'
+          driver_id?: string | null
+          daily_fee?: number
+          savings_amount?: number
+          start_time?: string | null
+          end_time?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          vehiculo_id?: string
+          shift?: 'dia' | 'noche'
+          driver_id?: string | null
+          daily_fee?: number
+          savings_amount?: number
+          start_time?: string | null
+          end_time?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehiculo_turnos_vehiculo_id_fkey"
+            columns: ["vehiculo_id"]
+            referencedRelation: "vehiculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehiculo_turnos_driver_id_fkey"
+            columns: ["driver_id"]
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+
       control: {
         Row: {
           id: string
@@ -550,6 +615,7 @@ export interface Database {
           to_date: string
           detail: string
           amount: number
+          concept: 'devolucion_ahorro' | 'prestaciones_sociales' | 'legacy_sin_clasificar' | 'otro'
           created_at: string
         }
         Insert: {
@@ -560,6 +626,7 @@ export interface Database {
           to_date: string
           detail: string
           amount?: number
+          concept?: 'devolucion_ahorro' | 'prestaciones_sociales' | 'legacy_sin_clasificar' | 'otro'
           created_at?: string
         }
         Update: {
@@ -570,8 +637,10 @@ export interface Database {
           to_date?: string
           detail?: string
           amount?: number
+          concept?: 'devolucion_ahorro' | 'prestaciones_sociales' | 'legacy_sin_clasificar' | 'otro'
           created_at?: string
         }
+
         Relationships: [
           {
             foreignKeyName: "liquidacion_tercero_id_fkey"
@@ -809,6 +878,27 @@ export interface Database {
         }
         Returns: Json
       }
+      get_driver_savings_summary: {
+        Args: {
+          p_driver_id: string
+        }
+        Returns: {
+          res_driver_id: string
+          res_driver_name: string
+          res_total_generated: number
+          res_total_returned: number
+          res_available_balance: number
+        }[]
+      }
+      register_driver_savings_return: {
+        Args: {
+          p_driver_id: string
+          p_amount: number
+          p_notes?: string | null
+        }
+        Returns: Json
+      }
+
     }
     Enums: {
       [_ in never]: never

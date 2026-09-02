@@ -144,6 +144,8 @@ interface RawProduccionRow {
   id: string;
   vehiculo_id: string;
   date: string;
+  shift?: string;
+  driver_id?: string;
   amount: number | string;
   deduction: number | string;
   status: any;
@@ -153,6 +155,7 @@ interface RawProduccionRow {
   updated_at: string;
   vehiculo?: RawVehiculoRow;
 }
+
 
 interface RawGpsPositionRow {
   id: number | string;
@@ -753,6 +756,8 @@ export const adminService = {
       id: p.id,
       vehiculoId: p.vehiculo_id,
       date: p.date,
+      shift: (p.shift || 'dia') as any,
+      driverId: p.driver_id || undefined,
       amount: Number(p.amount || 0),
       deduction: Number(p.deduction || 0),
       status: p.status,
@@ -762,6 +767,7 @@ export const adminService = {
       updatedAt: p.updated_at,
       vehiculo: p.vehiculo ? this.mapRowToVehiculo(p.vehiculo) : undefined,
     }));
+
   },
 
   /**
@@ -792,4 +798,60 @@ export const adminService = {
       timestamp: p.recorded_at,
     }));
   },
+
+  /**
+   * Obtener los turnos (Día / Noche) configurados para un vehículo
+   */
+  async fetchVehiculoTurnos(vehiculoId: string) {
+    const { data, error } = await supabase
+      .from('vehiculo_turnos')
+      .select(`
+        *,
+        driver:terceros!vehiculo_turnos_driver_id_fkey (*)
+      `)
+      .eq('vehiculo_id', vehiculoId)
+      .order('shift', { ascending: true });
+
+    if (error || !data) return [];
+    return data;
+  },
+
+  /**
+   * Guardar o actualizar la configuración de un turno (Día / Noche) de un vehículo
+   */
+  async saveVehiculoShift(input: {
+    vehiculoId: string;
+    shift: 'dia' | 'noche';
+    driverId?: string;
+    dailyFee: number;
+    savingsAmount: number;
+    startTime?: string;
+    endTime?: string;
+  }) {
+    const { data, error } = await supabase
+      .from('vehiculo_turnos')
+      .upsert(
+        {
+          vehiculo_id: input.vehiculoId,
+          shift: input.shift,
+          driver_id: input.driverId || null,
+          daily_fee: input.dailyFee >= 0 ? input.dailyFee : 0,
+          savings_amount: input.savingsAmount >= 0 ? input.savingsAmount : 0,
+          start_time: input.startTime || (input.shift === 'dia' ? '05:00:00' : '19:00:00'),
+          end_time: input.endTime || (input.shift === 'dia' ? '19:00:00' : '05:00:00'),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'vehiculo_id,shift' }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving vehiculo_turno:', error);
+      throw new Error(`No se pudo guardar la configuración del turno ${input.shift.toUpperCase()}: ${error.message}`);
+    }
+
+    return data;
+  },
 };
+

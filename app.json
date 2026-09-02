@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "8170a173-4784-4ecd-b8bd-6d8339fc0a5e"
+      }
+    },
+    "android": {
+      "package": "com.syscafe.maquitaxis"
+    }
+  }
+}

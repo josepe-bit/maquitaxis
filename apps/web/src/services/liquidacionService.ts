@@ -111,6 +111,7 @@ export const liquidacionService = {
         to_date: input.toDate,
         detail: input.detail,
         amount: input.amount,
+        concept: input.concept || 'prestaciones_sociales',
       })
       .select()
       .single();
@@ -128,9 +129,11 @@ export const liquidacionService = {
       toDate: data.to_date,
       detail: data.detail,
       amount: Number(data.amount || 0),
+      concept: data.concept as any,
       createdAt: data.created_at,
     };
   },
+
 
   /**
    * Actualizar registro de liquidación

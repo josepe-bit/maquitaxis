@@ -55,6 +55,16 @@ export const VehiculosManagementPage: React.FC = () => {
   const [savingsAmount, setSavingsAmount] = useState('10000');
   const [status, setStatus] = useState<TaxiStatus>('disponible');
 
+  // Configuración de Turnos (Día / Noche)
+  const [dayDriverId, setDayDriverId] = useState('');
+  const [dayFee, setDayFee] = useState('110000');
+  const [daySavings, setDaySavings] = useState('10000');
+
+  const [nightDriverId, setNightDriverId] = useState('');
+  const [nightFee, setNightFee] = useState('110000');
+  const [nightSavings, setNightSavings] = useState('10000');
+
+
   useEffect(() => {
     loadData();
   }, [searchQuery, statusFilter]);
@@ -109,6 +119,14 @@ export const VehiculosManagementPage: React.FC = () => {
     setSavingsAmount('10000');
     setStatus('disponible');
 
+    setDayDriverId('');
+    setDayFee('110000');
+    setDaySavings('10000');
+
+    setNightDriverId('');
+    setNightFee('110000');
+    setNightSavings('10000');
+
     setShowFormModal(true);
   };
 
@@ -142,8 +160,33 @@ export const VehiculosManagementPage: React.FC = () => {
     setSavingsAmount(String(v.savingsAmount || 0));
     setStatus(v.status);
 
+    setDayDriverId(v.driverId || '');
+    setDayFee(String(v.dailyFee || 110000));
+    setDaySavings(String(v.savingsAmount || 10000));
+
+    setNightDriverId('');
+    setNightFee(String(v.dailyFee || 110000));
+    setNightSavings(String(v.savingsAmount || 10000));
+
+    adminService.fetchVehiculoTurnos(v.id).then((turnos: any[]) => {
+      const day = turnos.find((t) => t.shift === 'dia');
+      const night = turnos.find((t) => t.shift === 'noche');
+
+      if (day) {
+        setDayDriverId(day.driver_id || v.driverId || '');
+        setDayFee(String(day.daily_fee ?? v.dailyFee ?? 110000));
+        setDaySavings(String(day.savings_amount ?? v.savingsAmount ?? 10000));
+      }
+      if (night) {
+        setNightDriverId(night.driver_id || '');
+        setNightFee(String(night.daily_fee ?? v.dailyFee ?? 110000));
+        setNightSavings(String(night.savings_amount ?? v.savingsAmount ?? 10000));
+      }
+    });
+
     setShowFormModal(true);
   };
+
 
   const handleOpenViewModal = async (v: Vehiculo) => {
     setViewingVehiculo(v);
@@ -171,12 +214,14 @@ export const VehiculosManagementPage: React.FC = () => {
 
     setSaving(true);
     try {
+      let savedVehiculo: Vehiculo;
+
       if (editingVehiculo) {
         const updateInput: UpdateVehiculoFullInput = {
           plate: plate.trim(),
           model: model.trim(),
           ownerId,
-          driverId: driverId || undefined,
+          driverId: dayDriverId || driverId || undefined,
           affiliatedCompanyId: affiliatedCompanyId || undefined,
           servicioId,
           marcaId: marcaId || undefined,
@@ -191,19 +236,19 @@ export const VehiculosManagementPage: React.FC = () => {
           operationCardExpedition: operationCardExpedition || undefined,
           operationCardValidityStart: operationCardValidityStart || undefined,
           operationCardValidityEnd: operationCardValidityEnd || undefined,
-          dailyFee: Number(dailyFee) || 0,
+          dailyFee: Number(dayFee) || Number(dailyFee) || 0,
           startShiftTime,
           endShiftTime,
-          savingsAmount: Number(savingsAmount) || 0,
+          savingsAmount: Number(daySavings) || Number(savingsAmount) || 0,
           status,
         };
-        await adminService.updateVehiculoFull(editingVehiculo.id, updateInput);
+        savedVehiculo = await adminService.updateVehiculoFull(editingVehiculo.id, updateInput);
       } else {
         const createInput: CreateVehiculoFullInput = {
           plate: plate.trim(),
           model: model.trim(),
           ownerId,
-          driverId: driverId || undefined,
+          driverId: dayDriverId || driverId || undefined,
           affiliatedCompanyId: affiliatedCompanyId || undefined,
           servicioId,
           marcaId: marcaId || undefined,
@@ -218,22 +263,45 @@ export const VehiculosManagementPage: React.FC = () => {
           operationCardExpedition: operationCardExpedition || undefined,
           operationCardValidityStart: operationCardValidityStart || undefined,
           operationCardValidityEnd: operationCardValidityEnd || undefined,
-          dailyFee: Number(dailyFee) || 0,
+          dailyFee: Number(dayFee) || Number(dailyFee) || 0,
           startShiftTime,
           endShiftTime,
-          savingsAmount: Number(savingsAmount) || 0,
+          savingsAmount: Number(daySavings) || Number(savingsAmount) || 0,
           status,
         };
-        await adminService.createVehiculoFull(createInput);
+        savedVehiculo = await adminService.createVehiculoFull(createInput);
       }
+
+      // Guardar Configuración de Turno Día y Turno Noche en vehiculo_turnos
+      await Promise.all([
+        adminService.saveVehiculoShift({
+          vehiculoId: savedVehiculo.id,
+          shift: 'dia',
+          driverId: dayDriverId || undefined,
+          dailyFee: Number(dayFee) || 0,
+          savingsAmount: Number(daySavings) || 0,
+          startTime: '05:00',
+          endTime: '19:00',
+        }),
+        adminService.saveVehiculoShift({
+          vehiculoId: savedVehiculo.id,
+          shift: 'noche',
+          driverId: nightDriverId || undefined,
+          dailyFee: Number(nightFee) || 0,
+          savingsAmount: Number(nightSavings) || 0,
+          startTime: '19:00',
+          endTime: '05:00',
+        }),
+      ]);
 
       setShowFormModal(false);
       await loadData();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al guardar el vehículo.');
+      setErrorMsg(err.message || 'Error al guardar el vehículo y sus turnos.');
     } finally {
       setSaving(false);
     }
+
   };
 
   const handleDeleteVehiculo = async (v: Vehiculo) => {
@@ -739,72 +807,117 @@ export const VehiculosManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sección 5: Configuración Operativa y Estado */}
+              {/* Sección 5: Configuración de Turnos (Día / Noche) */}
               <div style={{ background: 'var(--bg-dark)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <h4 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--primary)', fontWeight: '800', marginBottom: '0.75rem' }}>
-                  CONFIGURACIÓN OPERATIVA Y ESTADO
+                  CONFIGURACIÓN DE TURNOS (DÍA Y NOCHE)
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Cuota ($)</label>
-                    <input
-                      type="number"
-                      value={dailyFee}
-                      onChange={(e) => setDailyFee(e.target.value)}
-                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
-                    />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  {/* Turno Día */}
+                  <div style={{ padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)', backgroundColor: 'rgba(245, 158, 11, 0.05)' }}>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '0.85rem', fontWeight: '700' }}>
+                      ☀️ TURNO DÍA (05:00 - 19:00)
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>Conductor Turno Día</label>
+                        <select
+                          value={dayDriverId}
+                          onChange={(e) => setDayDriverId(e.target.value)}
+                          style={{ width: '100%', padding: '0.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.8rem' }}
+                        >
+                          <option value="">-- Sin Conductor --</option>
+                          {driversList.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.docNumber})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>Cuota Día ($)</label>
+                          <input
+                            type="number"
+                            value={dayFee}
+                            onChange={(e) => setDayFee(e.target.value)}
+                            style={{ width: '100%', padding: '0.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>Ahorro Día ($)</label>
+                          <input
+                            type="number"
+                            value={daySavings}
+                            onChange={(e) => setDaySavings(e.target.value)}
+                            style={{ width: '100%', padding: '0.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Ahorro ($)</label>
-                    <input
-                      type="number"
-                      value={savingsAmount}
-                      onChange={(e) => setSavingsAmount(e.target.value)}
-                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
-                    />
+                  {/* Turno Noche */}
+                  <div style={{ padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(168, 85, 247, 0.3)', backgroundColor: 'rgba(168, 85, 247, 0.05)' }}>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#c084fc', fontSize: '0.85rem', fontWeight: '700' }}>
+                      🌙 TURNO NOCHE (19:00 - 05:00)
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>Conductor Turno Noche</label>
+                        <select
+                          value={nightDriverId}
+                          onChange={(e) => setNightDriverId(e.target.value)}
+                          style={{ width: '100%', padding: '0.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.8rem' }}
+                        >
+                          <option value="">-- Sin Conductor --</option>
+                          {driversList.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.docNumber})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>Cuota Noche ($)</label>
+                          <input
+                            type="number"
+                            value={nightFee}
+                            onChange={(e) => setNightFee(e.target.value)}
+                            style={{ width: '100%', padding: '0.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>Ahorro Noche ($)</label>
+                          <input
+                            type="number"
+                            value={nightSavings}
+                            onChange={(e) => setNightSavings(e.target.value)}
+                            style={{ width: '100%', padding: '0.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Inicio Turno</label>
-                    <input
-                      type="text"
-                      value={startShiftTime}
-                      onChange={(e) => setStartShiftTime(e.target.value)}
-                      placeholder="05:00"
-                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Fin Turno</label>
-                    <input
-                      type="text"
-                      value={endShiftTime}
-                      onChange={(e) => setEndShiftTime(e.target.value)}
-                      placeholder="19:00"
-                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Estado</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as TaxiStatus)}
-                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
-                    >
-                      <option value="disponible">disponible</option>
-                      <option value="en_servicio">en_servicio</option>
-                      <option value="fuera_de_servicio">fuera_de_servicio</option>
-                      <option value="sin_conexion">sin_conexion</option>
-                    </select>
-                  </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Estado Operativo del Taxi</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as TaxiStatus)}
+                    style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
+                  >
+                    <option value="disponible">disponible</option>
+                    <option value="en_servicio">en_servicio</option>
+                  </select>
                 </div>
               </div>
 
               {/* Acciones */}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button
                   type="button"

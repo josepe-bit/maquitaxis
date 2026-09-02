@@ -1,9 +1,19 @@
 import { supabase } from './supabase';
-import { ProduccionDiaria, ProductionStatus, Vehiculo, LiquidacionConductor } from '@maquitaxis/shared';
+import {
+  ProduccionDiaria,
+  ProductionStatus,
+  Vehiculo,
+  LiquidacionConductor,
+  ShiftType,
+  VehiculoShift,
+  DriverSavingsSummary,
+} from '@maquitaxis/shared';
 
 export interface CreateProduccionInput {
   vehiculoId: string;
   date: string; // YYYY-MM-DD
+  shift: ShiftType; // 'dia' | 'noche'
+  driverId?: string; // Conductor asignado a la jornada
   status: ProductionStatus; // 'trabajo' | 'pico_y_placa' | 'taller' | 'descanso'
   amount: number; // Cuota del taxi (le queda al propietario)
   savingsAmount: number; // Ahorro personal del conductor (guardado por el propietario)
@@ -13,29 +23,73 @@ export interface CreateProduccionInput {
 
 export interface UpdateProduccionInput extends Partial<CreateProduccionInput> {}
 
-export interface SavingsSummaryResult {
-  driverTerceroId?: string;
-  driverName?: string;
-  vehiculoPlate?: string;
-  fromDate: string;
-  toDate: string;
-  totalDaysWorked: number;
-  totalBaseCuotas: number;
-  totalSavingsAmount: number; // Ahorro acumulado a devolver
-  totalDeductions: number;
-  netDeliveredCash: number; // (Cuotas + Ahorro) - Deducciones
-  recordsCount: number;
-}
-
 export const produccionService = {
   /**
-   * Obtener lista de registros de producción diaria con información del vehículo y conductor
+   * Obtener turnos configurados para un vehículo (Día / Noche)
    */
-  async fetchProducciones(vehiculoId?: string, startDate?: string, endDate?: string): Promise<ProduccionDiaria[]> {
+  async fetchVehiculoTurnos(vehiculoId: string): Promise<VehiculoShift[]> {
+    const { data, error } = await supabase
+      .from('vehiculo_turnos')
+      .select(`
+        *,
+        driver:terceros!vehiculo_turnos_driver_id_fkey (
+          id,
+          name,
+          doc_number,
+          phone,
+          email
+        )
+      `)
+      .eq('vehiculo_id', vehiculoId)
+      .order('shift', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching vehiculo_turnos:', error);
+      return [];
+    }
+
+    return (data || []).map((vt: any) => ({
+      id: vt.id,
+      vehiculoId: vt.vehiculo_id,
+      shift: vt.shift as ShiftType,
+      driverId: vt.driver_id,
+      dailyFee: Number(vt.daily_fee || 0),
+      savingsAmount: Number(vt.savings_amount || 0),
+      startTime: vt.start_time,
+      endTime: vt.end_time,
+      createdAt: vt.created_at,
+      updatedAt: vt.updated_at,
+      driver: vt.driver
+        ? {
+            id: vt.driver.id,
+            name: vt.driver.name,
+            docNumber: vt.driver.doc_number,
+            phone: vt.driver.phone,
+            email: vt.driver.email,
+          } as any
+        : undefined,
+    }));
+  },
+
+  /**
+   * Obtener lista de registros de producción diaria por vehículo, rango de fechas, turno o conductor
+   */
+  async fetchProducciones(
+    vehiculoId?: string,
+    startDate?: string,
+    endDate?: string,
+    shift?: ShiftType,
+    driverId?: string
+  ): Promise<ProduccionDiaria[]> {
     let query = supabase
       .from('produccion')
       .select(`
         *,
+        driver:terceros!produccion_driver_id_fkey (
+          id,
+          name,
+          doc_number
+        ),
         vehiculo:vehiculos (
           id,
           plate,
@@ -52,7 +106,8 @@ export const produccionService = {
           )
         )
       `)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .order('shift', { ascending: true });
 
     if (vehiculoId && vehiculoId.trim() !== '') {
       query = query.eq('vehiculo_id', vehiculoId);
@@ -62,6 +117,12 @@ export const produccionService = {
     }
     if (endDate) {
       query = query.lte('date', endDate);
+    }
+    if (shift) {
+      query = query.eq('shift', shift);
+    }
+    if (driverId && driverId.trim() !== '') {
+      query = query.eq('driver_id', driverId);
     }
 
     const { data, error } = await query;
@@ -77,6 +138,8 @@ export const produccionService = {
       id: p.id,
       vehiculoId: p.vehiculo_id,
       date: p.date,
+      shift: (p.shift || 'dia') as ShiftType,
+      driverId: p.driver_id || undefined,
       amount: Number(p.amount || 0),
       deduction: Number(p.deduction || 0),
       status: p.status as ProductionStatus,
@@ -84,6 +147,20 @@ export const produccionService = {
       savingsAmount: p.savings_amount ? Number(p.savings_amount) : 0,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
+      driver: p.driver
+        ? ({
+            id: p.driver.id,
+            name: p.driver.name,
+            docNumber: p.driver.doc_number,
+            docType: 'CC',
+            isOwner: false,
+            isServiceClient: false,
+            isDriver: true,
+            isSupplier: false,
+            createdAt: '',
+            updatedAt: '',
+          } as any)
+        : undefined,
       vehiculo: p.vehiculo
         ? {
             id: p.vehiculo.id,
@@ -97,10 +174,11 @@ export const produccionService = {
           } as any
         : undefined,
     }));
+
   },
 
   /**
-   * Obtener vehículos activos con su cuota y ahorro configurados
+   * Obtener vehículos activos para formularios de producción
    */
   async fetchVehiculosForProduction(): Promise<Vehiculo[]> {
     const { data, error } = await supabase
@@ -145,25 +223,27 @@ export const produccionService = {
   },
 
   /**
-   * Registrar una nueva producción diaria
+   * Registrar una nueva producción diaria asociando vehículo, fecha, turno y conductor
    */
   async createProduccion(input: CreateProduccionInput): Promise<ProduccionDiaria> {
     const isWorking = input.status === 'trabajo';
     const finalAmount = isWorking ? input.amount : 0;
     const finalSavings = isWorking ? input.savingsAmount : 0;
     const finalDeduction = isWorking ? input.deduction : 0;
+    const shift = input.shift || 'dia';
 
-    // Verificar si ya existe un registro de producción para el mismo vehículo y fecha
+    // Verificar si ya existe producción para la clave única (vehiculo_id + date + shift)
     const { data: existing } = await supabase
       .from('produccion')
       .select('id')
       .eq('vehiculo_id', input.vehiculoId)
       .eq('date', input.date)
+      .eq('shift', shift)
       .maybeSingle();
 
     if (existing) {
       throw new Error(
-        `Ya existe un registro de producción guardado para este vehículo en la fecha ${input.date}. Por favor edita el registro existente.`
+        `Ya existe un registro de producción para este vehículo en la fecha ${input.date} para el turno ${shift.toUpperCase()}. Por favor edita el registro existente.`
       );
     }
 
@@ -172,6 +252,8 @@ export const produccionService = {
       .insert({
         vehiculo_id: input.vehiculoId,
         date: input.date,
+        shift: shift,
+        driver_id: input.driverId || null,
         status: input.status,
         amount: finalAmount,
         savings_amount: finalSavings,
@@ -190,6 +272,8 @@ export const produccionService = {
       id: data.id,
       vehiculoId: data.vehiculo_id,
       date: data.date,
+      shift: data.shift as ShiftType,
+      driverId: data.driver_id || undefined,
       amount: Number(data.amount || 0),
       deduction: Number(data.deduction || 0),
       status: data.status as ProductionStatus,
@@ -209,18 +293,23 @@ export const produccionService = {
     const finalSavings = isWorking ? (input.savingsAmount ?? 0) : 0;
     const finalDeduction = isWorking ? (input.deduction ?? 0) : 0;
 
+    const updateData: any = {
+      status: input.status,
+      amount: finalAmount,
+      savings_amount: finalSavings,
+      deduction: finalDeduction,
+      mileage: input.mileage ?? 0,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.vehiculoId) updateData.vehiculo_id = input.vehiculoId;
+    if (input.date) updateData.date = input.date;
+    if (input.shift) updateData.shift = input.shift;
+    if (input.driverId !== undefined) updateData.driver_id = input.driverId || null;
+
     const { data, error } = await supabase
       .from('produccion')
-      .update({
-        vehiculo_id: input.vehiculoId,
-        date: input.date,
-        status: input.status,
-        amount: finalAmount,
-        savings_amount: finalSavings,
-        deduction: finalDeduction,
-        mileage: input.mileage ?? 0,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -234,6 +323,8 @@ export const produccionService = {
       id: data.id,
       vehiculoId: data.vehiculo_id,
       date: data.date,
+      shift: data.shift as ShiftType,
+      driverId: data.driver_id || undefined,
       amount: Number(data.amount || 0),
       deduction: Number(data.deduction || 0),
       status: data.status as ProductionStatus,
@@ -257,123 +348,64 @@ export const produccionService = {
   },
 
   /**
-   * Calcular resumen de ahorro acumulado de un conductor para devolución / liquidación entre fechas
+   * Obtener resumen de saldo acumulado de ahorro del CONDUCTOR consumiendo la función SQL de la BD
    */
-  async calculateSavingsSummary(
-    vehiculoId: string,
-    fromDate: string,
-    toDate: string
-  ): Promise<SavingsSummaryResult> {
-    const { data: producciones, error } = await supabase
-      .from('produccion')
-      .select(`
-        *,
-        vehiculo:vehiculos (
-          id,
-          plate,
-          driver:terceros!vehiculos_driver_id_fkey (
-            id,
-            name
-          )
-        )
-      `)
-      .eq('vehiculo_id', vehiculoId)
-      .gte('date', fromDate)
-      .lte('date', toDate);
+  async getDriverSavingsSummary(driverId: string): Promise<DriverSavingsSummary> {
+    const { data, error } = await supabase.rpc('get_driver_savings_summary', {
+      p_driver_id: driverId,
+    });
 
     if (error) {
-      console.error('Error calculating savings summary:', error);
-      throw new Error(`Error al consultar ahorro acumulado: ${error.message}`);
+      console.error('Error in rpc get_driver_savings_summary:', error);
+      throw new Error(`Error al consultar el saldo de ahorro del conductor: ${error.message}`);
     }
 
-    if (!producciones || producciones.length === 0) {
+    const row = Array.isArray(data) ? data[0] : data;
+
+    if (!row) {
       return {
-        fromDate,
-        toDate,
-        totalDaysWorked: 0,
-        totalBaseCuotas: 0,
-        totalSavingsAmount: 0,
-        totalDeductions: 0,
-        netDeliveredCash: 0,
-        recordsCount: 0,
+        driverId,
+        driverName: 'Conductor',
+        totalGenerated: 0,
+        totalReturned: 0,
+        availableBalance: 0,
       };
     }
 
-    let totalWorked = 0;
-    let totalCuotas = 0;
-    let totalSavings = 0;
-    let totalDeductions = 0;
-
-    const sample = producciones[0];
-    const driverName = sample?.vehiculo?.driver?.name || 'Desconocido';
-    const driverId = sample?.vehiculo?.driver?.id;
-    const plate = sample?.vehiculo?.plate;
-
-    producciones.forEach((p: any) => {
-      if (p.status === 'trabajo') {
-        totalWorked++;
-        totalCuotas += Number(p.amount || 0);
-        totalSavings += Number(p.savings_amount || 0);
-        totalDeductions += Number(p.deduction || 0);
-      }
-    });
-
-    const netDelivered = (totalCuotas + totalSavings) - totalDeductions;
-
     return {
-      driverTerceroId: driverId,
-      driverName,
-      vehiculoPlate: plate,
-      fromDate,
-      toDate,
-      totalDaysWorked: totalWorked,
-      totalBaseCuotas: totalCuotas,
-      totalSavingsAmount: totalSavings,
-      totalDeductions: totalDeductions,
-      netDeliveredCash: netDelivered,
-      recordsCount: producciones.length,
+      driverId: row.res_driver_id || driverId,
+      driverName: row.res_driver_name || 'Conductor',
+      totalGenerated: Number(row.res_total_generated || 0),
+      totalReturned: Number(row.res_total_returned || 0),
+      availableBalance: Number(row.res_available_balance || 0),
     };
   },
 
   /**
-   * Registrar devolución de ahorro acumulado en la tabla liquidación
+   * Registrar devolución de ahorro al conductor mediante la función RPC ATÓMICA en PostgreSQL
    */
-  async registerLiquidacionAhorro(
-    terceroId: string,
-    fromDate: string,
-    toDate: string,
-    savingsAmount: number,
+  async registerDriverSavingsReturn(
+    driverId: string,
+    amount: number,
     notes?: string
-  ): Promise<LiquidacionConductor> {
-    const detailText = `Devolución de Ahorro Acumulado del Conductor: ${notes || ''} (Monto Devuelto: $${savingsAmount.toLocaleString('es-CO')})`;
-
-    const { data, error } = await supabase
-      .from('liquidacion')
-      .insert({
-        tercero_id: terceroId,
-        payment_date: new Date().toISOString().split('T')[0],
-        from_date: fromDate,
-        to_date: toDate,
-        detail: detailText,
-        amount: savingsAmount,
-      })
-      .select()
-      .single();
+  ): Promise<{ success: boolean; liquidacionId: string; newAvailableBalance: number }> {
+    const { data, error } = await supabase.rpc('register_driver_savings_return', {
+      p_driver_id: driverId,
+      p_amount: amount,
+      p_notes: notes || null,
+    });
 
     if (error) {
-      console.error('Error registering liquidacion ahorro:', error);
-      throw new Error(`No se pudo registrar la liquidación del ahorro: ${error.message}`);
+      console.error('Error in rpc register_driver_savings_return:', error);
+      throw new Error(error.message);
     }
 
+    const res = typeof data === 'string' ? JSON.parse(data) : data;
+
     return {
-      id: data.id,
-      terceroId: data.tercero_id,
-      paymentDate: data.payment_date,
-      fromDate: data.from_date,
-      toDate: data.to_date,
-      detail: data.detail,
-      amount: Number(data.amount || savingsAmount),
-      createdAt: data.created_at,
+      success: res.success,
+      liquidacionId: res.liquidacion_id,
+      newAvailableBalance: Number(res.new_available_balance || 0),
     };
   },
 };

@@ -85,6 +85,7 @@ class LocationService {
           accuracy: Location.Accuracy.High,
           timeInterval: 10000,
           distanceInterval: 10,
+          showsBackgroundLocationIndicator: true,
           foregroundService: {
             notificationTitle: '🚕 MaquiTaxis GPS Activo',
             notificationBody: 'Transmitiendo posición del taxi en servicio.',

@@ -23,6 +23,12 @@ export type TaxiStatus = 'disponible' | 'en_servicio' | 'fuera_de_servicio' | 's
 export type ProductionStatus = 'trabajo' | 'pico_y_placa' | 'taller' | 'descanso';
 
 /**
+ * Turnos de operación del vehículo
+ */
+export type ShiftType = 'dia' | 'noche';
+
+
+/**
  * Estados de una carrera / viaje de taxi
  */
 export type CarreraStatus = 'pendiente' | 'asignado' | 'aceptado' | 'en_curso' | 'completado' | 'cancelado';
@@ -211,13 +217,44 @@ export interface UpdateEventoInput {
 
 
 /**
+ * Configuración de Turno de Vehículo (Turno Día / Turno Noche)
+ */
+export interface VehiculoShift {
+  id: string;
+  vehiculoId: string;
+  shift: ShiftType;
+  driverId?: string;
+  dailyFee: number;
+  savingsAmount: number;
+  startTime?: string;
+  endTime?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  driver?: Tercero;
+  vehiculo?: Vehiculo;
+}
+
+/**
+ * Resumen del Saldo Acumulado de Ahorro del Conductor
+ */
+export interface DriverSavingsSummary {
+  driverId: string;
+  driverName: string;
+  totalGenerated: number;
+  totalReturned: number;
+  availableBalance: number;
+}
+
+/**
  * Registro de Producción Diaria del Vehículo
  */
 export interface ProduccionDiaria {
   id: string;
   vehiculoId: string;
   date: string; // Fecha de la producción
-  amount: number; // Cuota del día (traída de vehículos)
+  shift: ShiftType; // Turno 'dia' | 'noche'
+  driverId?: string; // Conductor que realizó la jornada en este turno
+  amount: number; // Cuota del día para el propietario
   deduction: number; // Deducciones por gastos en el día
   status: ProductionStatus;
   mileage: number; // Kilometraje final de la jornada
@@ -225,7 +262,9 @@ export interface ProduccionDiaria {
   createdAt: string;
   updatedAt: string;
   vehiculo?: Vehiculo;
+  driver?: Tercero;
 }
+
 
 /**
  * Registro de Control (Ejecución de eventos de mantenimiento preventivo)
@@ -340,6 +379,7 @@ export interface LiquidacionConductor {
   toDate: string;
   detail: string;
   amount: number; // Valor pagado por concepto de liquidación
+  concept?: 'devolucion_ahorro' | 'prestaciones_sociales' | 'legacy_sin_clasificar' | 'otro';
   createdAt: string;
   tercero?: Tercero;
 }
@@ -351,7 +391,9 @@ export interface CreateLiquidacionInput {
   toDate: string;
   detail: string;
   amount: number;
+  concept?: 'devolucion_ahorro' | 'prestaciones_sociales' | 'legacy_sin_clasificar' | 'otro';
 }
+
 
 export interface UpdateLiquidacionInput extends Partial<CreateLiquidacionInput> {}
 
