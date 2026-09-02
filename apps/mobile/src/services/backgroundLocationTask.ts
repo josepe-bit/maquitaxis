@@ -19,12 +19,40 @@ export const setBackgroundTrackingParams = (sessionId: string, vehiculoId: strin
   currentBgSessionId = sessionId;
   currentBgVehiculoId = vehiculoId;
   lastBgRecordedPosition = null;
+  AsyncStorage.setItem(
+    STORAGE_KEYS.ACTIVE_SESSION,
+    JSON.stringify({ sessionId, vehiculoId })
+  ).catch(() => {});
+};
+
+export const clearBackgroundTrackingParams = () => {
+  currentBgSessionId = null;
+  currentBgVehiculoId = null;
+  lastBgRecordedPosition = null;
+  AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_SESSION).catch(() => {});
 };
 
 // Definir la tarea en segundo plano usando TaskManager
 TaskManager.defineTask<BackgroundTaskData>(BACKGROUND_LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error || !data || !data.locations || data.locations.length === 0) {
     return;
+  }
+
+  // Si las variables en memoria se perdieron tras la suspensión del runtime JS por el SO,
+  // intentar recuperar la sesión activa persistida en AsyncStorage
+  if (!currentBgSessionId || !currentBgVehiculoId) {
+    try {
+      const rawActive = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION);
+      if (rawActive) {
+        const parsed = JSON.parse(rawActive);
+        if (parsed?.sessionId && parsed?.vehiculoId) {
+          currentBgSessionId = parsed.sessionId;
+          currentBgVehiculoId = parsed.vehiculoId;
+        }
+      }
+    } catch {
+      // Ignorar error de lectura de AsyncStorage
+    }
   }
 
   if (!currentBgSessionId || !currentBgVehiculoId) {

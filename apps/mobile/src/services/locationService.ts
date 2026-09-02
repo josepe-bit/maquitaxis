@@ -6,6 +6,7 @@ import { GPSPosition, STORAGE_KEYS } from '@maquitaxis/shared';
 import {
   BACKGROUND_LOCATION_TASK_NAME,
   setBackgroundTrackingParams,
+  clearBackgroundTrackingParams,
 } from './backgroundLocationTask';
 
 export interface LocationUpdateHandler {
@@ -252,6 +253,7 @@ class LocationService {
     this.currentSessionId = null;
     this.currentVehiculoId = null;
     this.lastRecordedPosition = null;
+    clearBackgroundTrackingParams();
   }
 }
 

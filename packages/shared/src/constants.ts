@@ -20,4 +20,5 @@ export const REALTIME_TAXI_CHANNEL = 'taxi_locations_realtime';
 export const STORAGE_KEYS = {
   OFFLINE_GPS_QUEUE: '@maquitaxis:offline_gps_queue',
   AUTH_SESSION: '@maquitaxis:auth_session',
+  ACTIVE_SESSION: '@maquitaxis:active_gps_session',
 };
