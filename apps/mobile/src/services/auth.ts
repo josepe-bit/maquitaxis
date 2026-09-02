@@ -11,7 +11,7 @@ export interface AuthDriverState {
  */
 export const authDriverService = {
   /**
-   * Inicia sesión buscando primero el documento del tercero
+   * Inicia sesión llamando a la Edge Function de autenticación por documento
    */
   async loginWithDocument(docNumber: string, password: string): Promise<AuthDriverState> {
     const cleanDoc = docNumber.trim();
@@ -22,57 +22,56 @@ export const authDriverService = {
       throw new Error('La contraseña es obligatoria.');
     }
 
-    // 1. Buscar tercero por número de documento
-    const { data: tercero, error: terceroError } = await supabase
-      .from('terceros')
-      .select('*')
-      .eq('doc_number', cleanDoc)
-      .single();
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-    if (terceroError || !tercero) {
-      throw new Error('No se encontró ningún tercero registrado con ese número de documento.');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('No se encontró la configuración de conexión con el servidor.');
     }
 
-    if (!tercero.is_driver && !tercero.is_owner) {
-      throw new Error('El tercero registrado no posee permisos de conductor.');
+    let response: Response;
+    try {
+      response = await fetch(`${supabaseUrl}/functions/v1/mobile-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          docNumber: cleanDoc,
+          password: password,
+        }),
+      });
+    } catch (err: any) {
+      throw new Error('Error de conexión con el servidor. Comprueba tu conexión a internet.');
     }
 
-    // Usar email del tercero para Supabase Auth si existe, o correo formateado por documento
-    const userEmail = tercero.email || `doc_${cleanDoc}@maquitaxis.local`;
+    if (!response.ok) {
+      throw new Error('Credenciales de acceso inválidas. Verifica tu documento y contraseña.');
+    }
 
-    // 2. Autenticar con Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: userEmail,
-      password: password,
+    const data = await response.json().catch(() => ({}));
+    if (!data.session?.access_token || !data.session?.refresh_token) {
+      throw new Error('Credenciales de acceso inválidas. Verifica tu documento y contraseña.');
+    }
+
+    // Establecer la sesión oficialmente en el SDK de Supabase (guarda en AsyncStorage)
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
     });
 
-    if (authError) {
-      throw new Error(`Error de autenticación: ${authError.message}`);
+    if (sessionError) {
+      throw new Error(`Error al iniciar la sesión: ${sessionError.message}`);
     }
 
-    // 3. Consultar vehículo asignado al conductor
-    const vehiculo = await this.fetchAssignedVehicle(tercero.id);
+    // Obtener el estado del conductor autenticado
+    const driverState = await this.getCurrentDriverState();
+    if (!driverState) {
+      throw new Error('No fue posible obtener el perfil del conductor autenticado.');
+    }
 
-    return {
-      tercero: {
-        id: tercero.id,
-        userId: authData.user?.id || tercero.user_id || undefined,
-        docType: tercero.doc_type,
-        docNumber: tercero.doc_number,
-        name: tercero.name,
-        phone: tercero.phone || undefined,
-        address: tercero.address || undefined,
-        email: tercero.email || undefined,
-        driverLicenseNumber: tercero.driver_license_number || undefined,
-        isOwner: tercero.is_owner,
-        isServiceClient: tercero.is_service_client,
-        isDriver: tercero.is_driver,
-        isSupplier: tercero.is_supplier,
-        createdAt: tercero.created_at,
-        updatedAt: tercero.updated_at,
-      },
-      vehiculo,
-    };
+    return driverState;
   },
 
   /**

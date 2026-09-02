@@ -25,3 +25,7 @@ enabled = true
 
 [storage]
 enabled = true
+
+[functions.mobile-login]
+verify_jwt = false
+
