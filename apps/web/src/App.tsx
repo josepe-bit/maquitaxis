@@ -117,7 +117,40 @@ const MainContentLayout: React.FC = () => {
   const [selectedVehiculoId, setSelectedVehiculoId] = useState<string | undefined>(undefined);
   const [lastPositionEvent, setLastPositionEvent] = useState<string>('Esperando señal...');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const [openCategoryDropdown, setOpenCategoryDropdown] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  // Expandir por defecto únicamente la categoría que contiene la pestaña activa al abrir el menú
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      const currentCat = NAV_CATEGORIES.find((cat) =>
+        cat.items.some((item) => item.key === activeTab)
+      );
+      if (currentCat) {
+        setExpandedCategories({ [currentCat.id]: true });
+      } else {
+        setExpandedCategories({});
+      }
+    }
+  }, [mobileMenuOpen, activeTab]);
+
+  // Listener para cerrar el menú hamburguesa con la tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
+
+  const toggleCategory = (catId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [catId]: !prev[catId],
+    }));
+  };
+
 
   // Modal Cambiar Contraseña
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
@@ -272,12 +305,38 @@ const MainContentLayout: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 1.5rem',
+          padding: '0 1.25rem',
           background: 'var(--bg-card)',
           gap: '1rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flex: 1, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+          {/* Botón Menú Hamburguesa */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Abrir menú de navegación"
+            title="Menú de Navegación"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              padding: '0.45rem 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              backgroundColor: mobileMenuOpen ? 'var(--primary)' : 'rgba(51, 65, 85, 0.4)',
+              color: mobileMenuOpen ? 'var(--bg-dark)' : 'var(--text-primary)',
+              fontWeight: '700',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            <span style={{ fontSize: '0.85rem', fontWeight: '700' }}>Menú</span>
+          </button>
+
+          {/* Logo actual */}
           <div
             style={{
               display: 'flex',
@@ -286,98 +345,20 @@ const MainContentLayout: React.FC = () => {
               color: 'var(--primary)',
               fontWeight: '800',
               fontSize: '1.25rem',
-              flexShrink: 0,
             }}
           >
             <Car size={26} />
             <span>MaquiTaxis</span>
           </div>
-
-          {/* Menú para Conductor Operativo (Simple y Directo) */}
-          {rol === 'CONDUCTOR' ? (
-            <nav style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-              {[
-                { key: 'MAP_REALTIME' as ActiveWebTab, label: 'Mapa Tiempo Real', icon: <Map size={18} /> },
-                { key: 'CARRERAS' as ActiveWebTab, label: 'Despacho Carreras', icon: <Navigation size={18} /> },
-                { key: 'PRODUCCION' as ActiveWebTab, label: 'Producción Diaria', icon: <DollarSign size={18} /> },
-              ].map((item) => {
-                const isActive = activeTab === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => setActiveTab(item.key)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem 0.9rem',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: isActive ? 'var(--primary)' : 'rgba(51, 65, 85, 0.4)',
-                      color: isActive ? 'var(--bg-dark)' : '#f8fafc',
-                      fontWeight: isActive ? '800' : '600',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          ) : (
-            /* Menú Categorizado para Nivel 1 (SuperAdmin) y Nivel 2 (Gestor Flota) */
-            <nav style={{ display: 'flex', gap: '0.75rem', flexShrink: 0, alignItems: 'center' }}>
-              {visibleCategories.map((cat) => {
-                const hasActiveTab = cat.items.some((i) => i.key === activeTab);
-
-                return (
-                  <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: 'rgba(15, 23, 42, 0.4)', padding: '0.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', color: hasActiveTab ? 'var(--primary)' : 'var(--text-secondary)', paddingLeft: '0.4rem', paddingRight: '0.2rem', letterSpacing: '0.04em' }}>
-                      {cat.title}
-                    </span>
-
-                    {cat.items.map((item) => {
-                      const isActive = activeTab === item.key;
-                      return (
-                        <button
-                          key={item.key}
-                          onClick={() => setActiveTab(item.key)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            padding: '0.35rem 0.6rem',
-                            borderRadius: '6px',
-                            border: 'none',
-                            background: isActive ? 'var(--primary)' : 'transparent',
-                            color: isActive ? 'var(--bg-dark)' : 'var(--text-secondary)',
-                            fontWeight: isActive ? '800' : '500',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {item.icon}
-                          <span>{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </nav>
-          )}
         </div>
 
         {/* Panel de usuario y sesión */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.4rem',
               fontSize: '0.8rem',
               color: 'var(--text-secondary)',
             }}
@@ -391,7 +372,7 @@ const MainContentLayout: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '0.75rem',
-              paddingLeft: '1rem',
+              paddingLeft: '0.75rem',
               borderLeft: '1px solid var(--border-color)',
             }}
           >
@@ -475,6 +456,242 @@ const MainContentLayout: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Menú Hamburguesa Slide-Over & Acordeón */}
+      {mobileMenuOpen && (
+        <div
+          className="drawer-backdrop"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {mobileMenuOpen && (
+        <div className="drawer-content">
+          {/* Header del Drawer */}
+          <div
+            style={{
+              padding: '1.25rem',
+              borderBottom: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: 'rgba(30, 41, 59, 0.6)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: '800', fontSize: '1.15rem' }}>
+              <Car size={22} />
+              <span>Navegación</span>
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Cerrar menú"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '0.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px',
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Body del Drawer - Acordeón por Categorías */}
+          <div style={{ flex: 1, padding: '1rem 0.75rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {visibleCategories.map((cat) => {
+              const isExpanded = !!expandedCategories[cat.id];
+              const hasActiveTab = cat.items.some((i) => i.key === activeTab);
+
+              return (
+                <div
+                  key={cat.id}
+                  style={{
+                    borderRadius: '10px',
+                    border: hasActiveTab ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-color)',
+                    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Encabezado Categoría (Acordeón Header) */}
+                  <button
+                    onClick={() => toggleCategory(cat.id)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1rem',
+                      backgroundColor: isExpanded ? 'rgba(51, 65, 85, 0.4)' : 'transparent',
+                      border: 'none',
+                      color: hasActiveTab ? 'var(--primary)' : 'var(--text-primary)',
+                      fontWeight: '700',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background-color 0.2s',
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {cat.title}
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          backgroundColor: 'rgba(51, 65, 85, 0.6)',
+                          padding: '0.1rem 0.4rem',
+                          borderRadius: '9999px',
+                        }}
+                      >
+                        {cat.items.length}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      style={{
+                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    />
+                  </button>
+
+                  {/* Opciones desplegadas de la Categoría */}
+                  {isExpanded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0.4rem 0.5rem 0.5rem 0.5rem', borderTop: '1px solid rgba(51, 65, 85, 0.3)' }}>
+                      {cat.items.map((item) => {
+                        const isActive = activeTab === item.key;
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() => {
+                              setActiveTab(item.key);
+                              setMobileMenuOpen(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              width: '100%',
+                              minHeight: '44px',
+                              padding: '0.65rem 0.85rem',
+                              borderRadius: '8px',
+                              border: isActive ? '1px solid var(--primary)' : 'none',
+                              backgroundColor: isActive ? 'var(--primary)' : 'transparent',
+                              color: isActive ? 'var(--bg-dark)' : 'var(--text-secondary)',
+                              fontWeight: isActive ? '800' : '500',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              textAlign: 'left',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{item.icon}</span>
+                            <span style={{ flex: 1 }}>{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Perfil del Usuario & Acciones en Drawer */}
+          <div
+            style={{
+              padding: '1.25rem',
+              borderTop: '1px solid var(--border-color)',
+              backgroundColor: 'rgba(30, 41, 59, 0.7)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                {tercero?.name || user.email}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: '700',
+                    color: rol === 'NIVEL_1' ? '#38bdf8' : rol === 'NIVEL_2' ? '#10b981' : '#f59e0b',
+                    backgroundColor: 'rgba(51, 65, 85, 0.6)',
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                  }}
+                >
+                  {rol === 'NIVEL_1' ? 'NIVEL 1 - ADMIN' : rol === 'NIVEL_2' ? 'NIVEL 2 - GESTOR FLOTA' : 'CONDUCTOR'}
+                </span>
+                {tercero?.doc_number && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                    (Doc: {tercero.doc_number})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setShowPasswordModal(true);
+                  setPasswordFeedback(null);
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  color: 'var(--primary)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                }}
+              >
+                <KeyRound size={15} />
+                <span>Cambiar Clave</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+                title="Cerrar Sesión"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0.55rem 0.85rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                }}
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Modal Cambiar Contraseña */}
       {showPasswordModal && (
