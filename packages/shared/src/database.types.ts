@@ -442,7 +442,7 @@ export interface Database {
           quantity: number
           total_value: number
           current_mileage: number
-          next_change_mileage: number
+          next_change_mileage: number | null
           next_change_date: string | null
           created_at: string
         }
@@ -455,7 +455,7 @@ export interface Database {
           quantity?: number
           total_value?: number
           current_mileage?: number
-          next_change_mileage?: number
+          next_change_mileage?: number | null
           next_change_date?: string | null
           created_at?: string
         }
@@ -468,7 +468,7 @@ export interface Database {
           quantity?: number
           total_value?: number
           current_mileage?: number
-          next_change_mileage?: number
+          next_change_mileage?: number | null
           next_change_date?: string | null
           created_at?: string
         }

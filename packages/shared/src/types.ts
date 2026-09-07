@@ -278,8 +278,8 @@ export interface ControlEvento {
   quantity: number;
   totalValue: number; // unitValue * quantity
   currentMileage: number;
-  nextChangeMileage?: number; // currentMileage + kmsInterval
-  nextChangeDate?: string; // date + monthsInterval
+  nextChangeMileage?: number | null; // currentMileage + kmsInterval
+  nextChangeDate?: string | null; // date + monthsInterval
   createdAt: string;
   evento?: EventoCatalogo;
   vehiculo?: Vehiculo;
@@ -293,11 +293,12 @@ export interface CreateControlInput {
   quantity: number;
   totalValue: number;
   currentMileage: number;
-  nextChangeMileage?: number;
-  nextChangeDate?: string;
+  nextChangeMileage?: number | null;
+  nextChangeDate?: string | null;
 }
 
 export interface UpdateControlInput extends Partial<CreateControlInput> {}
+
 
 
 /**

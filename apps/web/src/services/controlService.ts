@@ -55,7 +55,7 @@ export const controlService = {
       quantity: Number(c.quantity || 1),
       totalValue: Number(c.total_value || 0),
       currentMileage: Number(c.current_mileage || 0),
-      nextChangeMileage: c.next_change_mileage ? Number(c.next_change_mileage) : undefined,
+      nextChangeMileage: c.next_change_mileage != null ? Number(c.next_change_mileage) : undefined,
       nextChangeDate: c.next_change_date || undefined,
       createdAt: c.created_at,
       evento: c.evento
@@ -161,7 +161,7 @@ export const controlService = {
         quantity: input.quantity,
         total_value: totalVal,
         current_mileage: input.currentMileage,
-        next_change_mileage: input.nextChangeMileage ?? 0,
+        next_change_mileage: input.nextChangeMileage ?? null,
         next_change_date: input.nextChangeDate || null,
       })
       .select()
@@ -191,7 +191,7 @@ export const controlService = {
       quantity: Number(data.quantity || 1),
       totalValue: Number(data.total_value || 0),
       currentMileage: Number(data.current_mileage || 0),
-      nextChangeMileage: data.next_change_mileage ? Number(data.next_change_mileage) : undefined,
+      nextChangeMileage: data.next_change_mileage != null ? Number(data.next_change_mileage) : undefined,
       nextChangeDate: data.next_change_date || undefined,
       createdAt: data.created_at,
     };
@@ -213,7 +213,7 @@ export const controlService = {
         quantity: input.quantity,
         total_value: totalVal,
         current_mileage: input.currentMileage,
-        next_change_mileage: input.nextChangeMileage ?? 0,
+        next_change_mileage: input.nextChangeMileage ?? null,
         next_change_date: input.nextChangeDate || null,
       })
       .eq('id', id)
@@ -246,7 +246,7 @@ export const controlService = {
       quantity: Number(data.quantity || 1),
       totalValue: Number(data.total_value || 0),
       currentMileage: Number(data.current_mileage || 0),
-      nextChangeMileage: data.next_change_mileage ? Number(data.next_change_mileage) : undefined,
+      nextChangeMileage: data.next_change_mileage != null ? Number(data.next_change_mileage) : undefined,
       nextChangeDate: data.next_change_date || undefined,
       createdAt: data.created_at,
     };

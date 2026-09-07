@@ -108,6 +108,33 @@ export const ControlManagementPage: React.FC = () => {
     }
   };
 
+  // Función auxiliar para sumar meses a una fecha "YYYY-MM-DD" sin desfases por zona horaria
+  const addMonthsToDateString = (dateStr: string, months: number): string => {
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return '';
+    const [year, month, day] = parts;
+
+    let targetMonth = month + months;
+    let targetYear = year;
+
+    while (targetMonth > 12) {
+      targetMonth -= 12;
+      targetYear += 1;
+    }
+    while (targetMonth < 1) {
+      targetMonth += 12;
+      targetYear -= 1;
+    }
+
+    const daysInTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+    const targetDay = Math.min(day, daysInTargetMonth);
+
+    const yyyy = String(targetYear);
+    const mm = String(targetMonth).padStart(2, '0');
+    const dd = String(targetDay).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   // Función para recalcular Próximo Cambio (Km y/o Fecha) de acuerdo al evento seleccionado
   const recalculateNextChanges = () => {
     if (!formEventoId) {
@@ -119,29 +146,22 @@ export const ControlManagementPage: React.FC = () => {
     const targetEvento = eventos.find((e) => e.id === formEventoId);
     if (!targetEvento) return;
 
+    const kmsInterval = targetEvento.kmsInterval ?? 0;
+    const monthsInterval = targetEvento.monthsInterval ?? 0;
     const currentKm = parseInt(formCurrentMileage, 10) || 0;
-    const appliesBy = targetEvento.appliesBy || 'kilometros';
 
-    // 1. Cálculo por Kilómetros
-    if (appliesBy === 'kilometros' || appliesBy === 'kilometros_y_meses') {
-      const nextKm = currentKm + (targetEvento.kmsInterval || 0);
+    // 1. Cálculo por Kilómetros (si kms_interval > 0)
+    if (kmsInterval > 0) {
+      const nextKm = currentKm + kmsInterval;
       setCalculatedNextMileage(nextKm);
     } else {
       setCalculatedNextMileage(undefined);
     }
 
-    // 2. Cálculo por Meses
-    if (appliesBy === 'meses' || appliesBy === 'kilometros_y_meses') {
-      if (formDate && targetEvento.monthsInterval && targetEvento.monthsInterval > 0) {
-        const baseDate = new Date(formDate);
-        baseDate.setMonth(baseDate.getMonth() + targetEvento.monthsInterval);
-        const yyyy = baseDate.getFullYear();
-        const mm = String(baseDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(baseDate.getDate()).padStart(2, '0');
-        setCalculatedNextDate(`${yyyy}-${mm}-${dd}`);
-      } else {
-        setCalculatedNextDate(undefined);
-      }
+    // 2. Cálculo por Meses (si months_interval > 0)
+    if (monthsInterval > 0 && formDate) {
+      const nextDate = addMonthsToDateString(formDate, monthsInterval);
+      setCalculatedNextDate(nextDate || undefined);
     } else {
       setCalculatedNextDate(undefined);
     }
@@ -215,6 +235,10 @@ export const ControlManagementPage: React.FC = () => {
       return;
     }
 
+    const targetEvento = eventos.find((ev) => ev.id === formEventoId);
+    const kmsInterval = targetEvento?.kmsInterval ?? 0;
+    const monthsInterval = targetEvento?.monthsInterval ?? 0;
+
     const unitVal = parseFloat(formUnitValue) || 0;
     const qty = parseInt(formQuantity, 10) || 1;
     const currentKm = parseInt(formCurrentMileage, 10) || 0;
@@ -226,6 +250,14 @@ export const ControlManagementPage: React.FC = () => {
     }
     if (qty <= 0) {
       setFormError('La cantidad debe ser mayor a cero.');
+      return;
+    }
+    if (currentKm < 0) {
+      setFormError('El kilometraje actual no puede ser negativo.');
+      return;
+    }
+    if (kmsInterval > 0 && isNaN(parseInt(formCurrentMileage, 10))) {
+      setFormError('Para eventos por kilometraje, debes ingresar un kilometraje actual válido.');
       return;
     }
 
