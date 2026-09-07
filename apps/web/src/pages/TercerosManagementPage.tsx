@@ -181,8 +181,9 @@ export const TercerosManagementPage: React.FC = () => {
 
   const handleOpenApproveModal = (t: Tercero) => {
     let initialRole: UserRole = 'CONDUCTOR';
-    if (t.isServiceClient) initialRole = 'NIVEL_2';
-    if (t.isOwner) initialRole = 'NIVEL_1';
+    if (t.requestedRole === 'NIVEL_1' || t.isOwner) initialRole = 'NIVEL_1';
+    else if (t.requestedRole === 'NIVEL_2' || t.isServiceClient) initialRole = 'NIVEL_2';
+    else if (t.requestedRole === 'CONDUCTOR' || t.isDriver) initialRole = 'CONDUCTOR';
 
     setApprovedRoleSelect(initialRole);
     setApprovingTercero(t);
@@ -241,6 +242,15 @@ export const TercerosManagementPage: React.FC = () => {
 
   const renderRoleBadges = (t: Tercero) => {
     const badges = [];
+    if (t.accessStatus === 'pending' && t.requestedRole) {
+      const label = t.requestedRole === 'NIVEL_1' ? 'SOLICITÓ NIVEL 1' : t.requestedRole === 'NIVEL_2' ? 'SOLICITÓ NIVEL 2' : 'SOLICITÓ CONDUCTOR';
+      const color = t.requestedRole === 'NIVEL_1' ? '#f59e0b' : t.requestedRole === 'NIVEL_2' ? '#10b981' : '#38bdf8';
+      badges.push(
+        <span key="requested" className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: color, padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '800', border: `1px solid ${color}` }}>
+          {label}
+        </span>
+      );
+    }
     if (t.isOwner) badges.push(<span key="owner" className="badge" style={{ background: '#f59e0b', color: '#0f172a' }}>PROPIETARIO</span>);
     if (t.isDriver) badges.push(<span key="driver" className="badge" style={{ background: '#3b82f6', color: '#fff' }}>CONDUCTOR</span>);
     if (t.isSupplier) badges.push(<span key="supplier" className="badge" style={{ background: '#8b5cf6', color: '#fff' }}>PROVEEDOR</span>);

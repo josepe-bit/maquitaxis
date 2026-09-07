@@ -58,6 +58,7 @@ export interface Tercero {
   isDriver: boolean; // Conductor
   isSupplier: boolean; // Proveedor de repuestos/mantenimiento
   accessStatus?: AccessStatus; // Estado de autorización de acceso a la app
+  requestedRole?: 'NIVEL_1' | 'NIVEL_2' | 'CONDUCTOR'; // Rol solicitado durante el registro inicial
   createdAt: string;
   updatedAt: string;
 }

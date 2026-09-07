@@ -99,6 +99,7 @@ interface RawTerceroRow {
   is_driver: boolean;
   is_supplier: boolean;
   access_status?: string;
+  requested_role?: string;
   created_at: string;
   updated_at: string;
 }
@@ -191,6 +192,7 @@ export const adminService = {
       isDriver: t.is_driver,
       isSupplier: t.is_supplier,
       accessStatus: t.access_status as any || 'pending',
+      requestedRole: t.requested_role as any,
       createdAt: t.created_at,
       updatedAt: t.updated_at,
     };
@@ -294,6 +296,9 @@ export const adminService = {
 
     if (statusFilter) {
       query = query.eq('access_status', statusFilter);
+      if (statusFilter === 'pending') {
+        query = query.not('user_id', 'is', null);
+      }
     }
 
     const { data, error } = await query;
@@ -351,6 +356,7 @@ export const adminService = {
         is_supplier: !!input.isSupplier,
         driver_license_number: input.driverLicenseNumber?.trim() || null,
         driver_license_expiration: input.driverLicenseExpiration || null,
+        access_status: 'approved',
       })
       .select('*')
       .single();

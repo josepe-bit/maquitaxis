@@ -49,18 +49,123 @@ serve(async (req) => {
     // 1. Buscar tercero internamente usando el cliente Service Role
     const { data: tercero } = await adminClient
       .from('terceros')
-      .select('id, user_id, email, is_driver, is_owner')
+      .select('id, user_id, email, is_driver, is_owner, access_status')
       .eq('doc_number', cleanDoc)
       .maybeSingle();
 
-    if (!tercero || (!tercero.is_driver && !tercero.is_owner)) {
-      return new Response(JSON.stringify({ error: 'Invalid login credentials' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // CASO A: Tercero administrativo sin usuario (user_id IS NULL)
+    if (tercero && !tercero.user_id) {
+      return new Response(
+        JSON.stringify({ error: 'El número de identificación ya se encuentra registrado. Comunícate con el Administrador para activar tu cuenta.' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    // 2. Resolver el identificador/email de Supabase Auth
+    // CASO C y D: Tercero existe con usuario en estado pending o rejected
+    if (tercero && tercero.user_id) {
+      if (tercero.access_status === 'pending') {
+        return new Response(
+          JSON.stringify({ error: 'Tu cuenta está pendiente de aprobación por el administrador.' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (tercero.access_status === 'rejected') {
+        return new Response(
+          JSON.stringify({ error: 'Tu acceso a MaquiTaxis no está autorizado. Comunícate con el administrador.' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (tercero.access_status !== 'approved' || (!tercero.is_driver && !tercero.is_owner)) {
+        return new Response(JSON.stringify({ error: 'Invalid login credentials' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // CASO F: Tercero no existe aún en public.terceros (Conductor nuevo registrado vía mobile)
+    if (!tercero) {
+      // Buscar usuario en auth.users por docNumber en metadata o email
+      const { data: usersList } = await adminClient.auth.admin.listUsers();
+      const matchedUser = (usersList?.users || []).find(
+        (u) => u.user_metadata?.docNumber === cleanDoc || u.email?.startsWith(`doc_${cleanDoc}@`)
+      );
+
+      if (!matchedUser || !matchedUser.email) {
+        return new Response(JSON.stringify({ error: 'Invalid login credentials' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Autenticar la contraseña con el cliente anon
+      const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
+        email: matchedUser.email,
+        password: password,
+      });
+
+      if (authError || !authData.user) {
+        return new Response(JSON.stringify({ error: 'Invalid login credentials' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verificar si el correo ya fue confirmado
+      if (!authData.user.email_confirmed_at) {
+        return new Response(
+          JSON.stringify({ error: 'Tu correo electrónico aún no ha sido verificado. Por favor revisa tu bandeja de entrada.' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Crear registro inicial del tercero en public.terceros con access_status = 'pending' y requested_role = 'CONDUCTOR'
+      const { error: insertErr } = await adminClient.from('terceros').insert({
+        doc_type: matchedUser.user_metadata?.docType || 'CC',
+        doc_number: cleanDoc,
+        name: matchedUser.user_metadata?.name || matchedUser.email.split('@')[0],
+        phone: matchedUser.user_metadata?.phone || null,
+        email: matchedUser.email,
+        user_id: authData.user.id,
+        requested_role: 'CONDUCTOR',
+        is_owner: false,
+        is_service_client: false,
+        is_driver: false,
+        is_supplier: false,
+        access_status: 'pending',
+      });
+
+      if (insertErr) {
+        console.error('Error al insertar tercero pending en mobile-login:', insertErr);
+      }
+
+      // Desconectar la sesión temporal creada durante la autenticación de validación
+      await authClient.auth.signOut().catch(() => {});
+
+      return new Response(
+        JSON.stringify({ error: 'Tu cuenta está pendiente de aprobación por el administrador.' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // 2. Resolver el email para tercero aprobado existente
     let userEmail: string | undefined = tercero.email ? tercero.email.trim() : undefined;
 
     if (!userEmail && tercero.user_id) {
@@ -74,7 +179,7 @@ serve(async (req) => {
       userEmail = `doc_${cleanDoc}@maquitaxis.local`;
     }
 
-    // 3. Autenticar con el cliente público (Anon Key)
+    // 3. Autenticar tercero aprobado con cliente Anon Key
     const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
       email: userEmail,
       password: password,

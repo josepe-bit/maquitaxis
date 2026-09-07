@@ -39,3 +39,11 @@ yarn-debug.log*
 yarn-error.log*
 logs/
 *.log
+
+# Shared package build outputs
+packages/shared/src/*.js
+packages/shared/src/*.d.ts
+
+# Supabase CLI temp files
+supabase/.temp/
+

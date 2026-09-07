@@ -1,6 +1,15 @@
 import { supabase } from './supabase';
 import { Tercero, Vehiculo } from '@maquitaxis/shared';
 
+export interface RegisterDriverInput {
+  docType?: string;
+  docNumber: string;
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
 export interface AuthDriverState {
   tercero: Tercero;
   vehiculo: Vehiculo | null;
@@ -10,6 +19,56 @@ export interface AuthDriverState {
  * Servicio de autenticación para conductores por documento/email y contraseña
  */
 export const authDriverService = {
+  /**
+   * Registrar nuevo conductor en Supabase Auth guardando la solicitud en user_metadata
+   */
+  async registerDriver(input: RegisterDriverInput): Promise<{ success: boolean; message: string }> {
+    const docNumberClean = input.docNumber.trim();
+    const emailClean = input.email.trim();
+    const nameClean = input.name.trim();
+
+    if (!docNumberClean) {
+      throw new Error('El número de documento es obligatorio.');
+    }
+    if (!nameClean) {
+      throw new Error('El nombre completo es obligatorio.');
+    }
+    if (!emailClean || !emailClean.includes('@')) {
+      throw new Error('Por favor ingresa un correo electrónico válido.');
+    }
+    if (!input.password || input.password.length < 6) {
+      throw new Error('La contraseña debe tener al menos 6 caracteres.');
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: emailClean,
+      password: input.password,
+      options: {
+        data: {
+          role: 'CONDUCTOR',
+          docNumber: docNumberClean,
+          name: nameClean,
+          phone: input.phone?.trim() || '',
+          docType: input.docType || 'CC',
+        },
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Error al registrar la cuenta.');
+    }
+
+    if (!data.user) {
+      throw new Error('No se pudo crear la cuenta de usuario.');
+    }
+
+    return {
+      success: true,
+      message:
+        '¡Registro recibido! Revisa tu correo electrónico para confirmar tu cuenta. Después de confirmar tu correo, espera la aprobación del administrador para poder ingresar a MaquiTaxis.',
+    };
+  },
+
   /**
    * Inicia sesión llamando a la Edge Function de autenticación por documento
    */
@@ -68,7 +127,8 @@ export const authDriverService = {
     // Obtener el estado del conductor autenticado
     const driverState = await this.getCurrentDriverState();
     if (!driverState) {
-      throw new Error('No fue posible obtener el perfil del conductor autenticado.');
+      await supabase.auth.signOut();
+      throw new Error('Tu cuenta no se encuentra aprobada para acceder a la aplicación móvil. Comunícate con el administrador.');
     }
 
     return driverState;
@@ -93,6 +153,12 @@ export const authDriverService = {
       .single();
 
     if (error || !tercero) {
+      return null;
+    }
+
+    // Segunda barrera de seguridad: Validar que el tercero tenga access_status = 'approved'
+    if (tercero.access_status !== 'approved') {
+      await supabase.auth.signOut();
       return null;
     }
 

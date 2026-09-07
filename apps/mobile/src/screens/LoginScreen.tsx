@@ -15,9 +15,10 @@ import { authDriverService, AuthDriverState } from '../services/auth';
 
 interface LoginScreenProps {
   onLoginSuccess: (state: AuthDriverState) => void;
+  onNavigateToRegister?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavigateToRegister }) => {
   const [docNumber, setDocNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -190,6 +191,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
             )}
           </TouchableOpacity>
+
+          {onNavigateToRegister && (
+            <TouchableOpacity
+              style={{ marginTop: 16, alignItems: 'center', paddingVertical: 4 }}
+              onPress={onNavigateToRegister}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#f59e0b', fontSize: 14, fontWeight: '600' }}>
+                ¿No tienes cuenta? Regístrate aquí
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />

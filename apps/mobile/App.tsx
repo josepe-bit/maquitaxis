@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { RegisterScreen } from './src/screens/RegisterScreen';
 import { DriverHomeScreen } from './src/screens/DriverHomeScreen';
 import { ProduccionScreen } from './src/screens/ProduccionScreen';
 import { MisCarrerasScreen } from './src/screens/MisCarrerasScreen';
@@ -9,10 +10,12 @@ import { AuthDriverState } from './src/services/auth';
 import { STORAGE_KEYS } from '@maquitaxis/shared';
 
 type ActiveScreen = 'HOME' | 'PRODUCCION' | 'CARRERAS';
+type AuthMode = 'LOGIN' | 'REGISTER';
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthDriverState | null>(null);
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>('HOME');
+  const [authMode, setAuthMode] = useState<AuthMode>('LOGIN');
   const [initializing, setInitializing] = useState<boolean>(true);
 
   // Intentar restaurar sesión persistida al iniciar la app
@@ -37,6 +40,7 @@ export default function App() {
   const handleLoginSuccess = async (state: AuthDriverState) => {
     setAuthState(state);
     setCurrentScreen('HOME');
+    setAuthMode('LOGIN');
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(state));
     } catch {
@@ -47,6 +51,7 @@ export default function App() {
   const handleLogout = async () => {
     setAuthState(null);
     setCurrentScreen('HOME');
+    setAuthMode('LOGIN');
     try {
       await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
     } catch {
@@ -63,7 +68,15 @@ export default function App() {
   }
 
   if (!authState) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    if (authMode === 'REGISTER') {
+      return <RegisterScreen onBackToLogin={() => setAuthMode('LOGIN')} />;
+    }
+    return (
+      <LoginScreen
+        onLoginSuccess={handleLoginSuccess}
+        onNavigateToRegister={() => setAuthMode('REGISTER')}
+      />
+    );
   }
 
   if (currentScreen === 'PRODUCCION') {
