@@ -107,6 +107,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           canAccessAll: true,
           allowedTabs: [
             'MAP_REALTIME',
+            'MONITOREO_GPS',
+            'DASHBOARD',
             'SERVICIOS_APP',
             'CARRERAS',
             'VEHICULOS',
@@ -133,7 +135,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'NIVEL_2':
         return {
           canAccessAll: false,
-          allowedTabs: ['VEHICULOS', 'EVENTOS', 'CONTROL', 'MANTENIMIENTO', 'SSOCIAL', 'LIQUIDACION', 'PRODUCCION'],
+          allowedTabs: ['VEHICULOS', 'MONITOREO_GPS', 'DASHBOARD', 'EVENTOS', 'CONTROL', 'MANTENIMIENTO', 'SSOCIAL', 'LIQUIDACION', 'PRODUCCION'],
           canManageVehiculos: true,
           canManageTerceros: false,
           canManageServicios: false,
@@ -147,7 +149,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'CONDUCTOR':
         return {
           canAccessAll: false,
-          allowedTabs: ['MAP_REALTIME', 'PRODUCCION', 'CARRERAS'],
+          allowedTabs: ['MAP_REALTIME', 'MONITOREO_GPS', 'PRODUCCION', 'CARRERAS'],
           canManageVehiculos: false,
           canManageTerceros: false,
           canManageServicios: false,

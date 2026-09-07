@@ -39,12 +39,16 @@ import { ControlManagementPage } from './pages/ControlManagementPage';
 import { MantenimientoVehiculoPage } from './pages/MantenimientoVehiculoPage';
 import { SSocialManagementPage } from './pages/SSocialManagementPage';
 import { LiquidacionConductorPage } from './pages/LiquidacionConductorPage';
+import { MonitoreoGpsPage } from './pages/MonitoreoGpsPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './pages/AuthView';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 type ActiveWebTab =
   | 'MAP_REALTIME'
+  | 'MONITOREO_GPS'
+  | 'DASHBOARD'
   | 'SERVICIOS_APP'
   | 'CARRERAS'
   | 'VEHICULOS'
@@ -76,6 +80,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     title: 'Operación',
     items: [
       { key: 'MAP_REALTIME', label: 'Mapa Tiempo Real', icon: <Map size={16} /> },
+      { key: 'MONITOREO_GPS', label: 'Monitoreo GPS (Realtime)', icon: <Radio size={16} /> },
       { key: 'CARRERAS', label: 'Despacho Carreras', icon: <Navigation size={16} /> },
       { key: 'HISTORY_ROUTES', label: 'Histórico Rutas', icon: <Activity size={16} /> },
     ],
@@ -95,6 +100,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     id: 'finanzas',
     title: 'Operación & Cuentas',
     items: [
+      { key: 'DASHBOARD', label: 'Dashboard Gerencial', icon: <DollarSign size={16} /> },
       { key: 'PRODUCCION', label: 'Producción Diaria', icon: <DollarSign size={16} /> },
       { key: 'LIQUIDACION', label: 'Liquidación Conductor', icon: <DollarSign size={16} /> },
       { key: 'SSOCIAL', label: 'Seguridad Social', icon: <ShieldCheck size={16} /> },
@@ -1008,6 +1014,8 @@ const MainContentLayout: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'MONITOREO_GPS' && <MonitoreoGpsPage />}
+          {activeTab === 'DASHBOARD' && <DashboardPage />}
           {activeTab === 'SERVICIOS_APP' && <ServiciosManagementPage />}
           {activeTab === 'CARRERAS' && <CarrerasAdminPage />}
           {activeTab === 'VEHICULOS' && <VehiculosManagementPage />}
