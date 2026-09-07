@@ -126,6 +126,8 @@ export interface Vehiculo {
   operationCardExpedition?: string;
   operationCardValidityStart?: string;
   operationCardValidityEnd?: string;
+  soatExpirationDate?: string;
+  tecnomecanicaExpirationDate?: string;
   dailyFee: number; // Valor de la cuota diaria entregada al propietario
   startShiftTime?: string; // Hora inicio de jornada (ej: "05:00")
   endShiftTime?: string; // Hora entrega del vehículo (ej: "19:00")
@@ -193,6 +195,9 @@ export interface EventoCatalogo {
   monthsInterval?: number; // Periodicidad en Meses
   appliesBy: EventoAppliesBy; // Criterio de aplicación: 'kilometros' | 'meses' | 'kilometros_y_meses' | 'ninguno'
   estimatedValue?: number;
+  advanceWarningKms?: number; // Umbral de anticipación en kilómetros (default 500)
+  advanceWarningDays?: number; // Umbral de anticipación en días (default 7)
+  isActive?: boolean; // Estado activo del evento para el motor de alertas
   createdAt?: string;
 }
 
@@ -206,6 +211,9 @@ export interface CreateEventoInput {
   monthsInterval?: number;
   appliesBy?: EventoAppliesBy;
   estimatedValue?: number;
+  advanceWarningKms?: number;
+  advanceWarningDays?: number;
+  isActive?: boolean;
 }
 
 export interface UpdateEventoInput {
@@ -214,6 +222,9 @@ export interface UpdateEventoInput {
   monthsInterval?: number;
   appliesBy?: EventoAppliesBy;
   estimatedValue?: number;
+  advanceWarningKms?: number;
+  advanceWarningDays?: number;
+  isActive?: boolean;
 }
 
 
@@ -438,4 +449,72 @@ export interface GPSConfig {
   minDistanceMeters: number;
   maxIntervalSeconds: number;
   minAccuracyMeters: number;
+}
+
+/**
+ * Estados del Sistema de Alertas de Mantenimiento y Vencimientos
+ */
+export type AlertState = 'NORMAL' | 'PROXIMO' | 'VENCIDO' | 'SIN_DATOS' | 'SIN_HISTORIAL';
+
+/**
+ * Estados de Envío de Email de Alerta
+ */
+export type AlertSendStatus = 'pending' | 'sent' | 'failed';
+
+/**
+ * Tipo de Notificación de Alerta
+ */
+export type AlertType = 'proximo' | 'vencido';
+
+/**
+ * Representación individual de Alerta por Vehículo y Evento
+ */
+export interface VehicleAlert {
+  vehiculoId: string;
+  plate: string;
+  model?: string | null;
+  eventoId: string;
+  eventoName: string;
+  appliesBy: EventoAppliesBy;
+  state: AlertState;
+  currentMileage: number | null;
+  targetMileage: number | null;
+  remainingKms: number | null;
+  targetDate: string | null;
+  remainingDays: number | null;
+  reason: string;
+  cycleAnchor: string;
+  driverId?: string | null;
+  driverName?: string | null;
+  ownerId?: string | null;
+  ownerName?: string | null;
+}
+
+/**
+ * Resumen Consolidado del Panorama de Alertas para el Dashboard
+ */
+export interface AlertsOverviewSummary {
+  vencidos: number;
+  proximos: number;
+  normales: number;
+  sinDatos: number;
+  sinHistorial: number;
+  alerts: VehicleAlert[];
+}
+
+/**
+ * Log de Deduplicación y Envío de Alertas (public.event_alerts_log)
+ */
+export interface EventAlertLog {
+  id: string;
+  vehiculoId: string;
+  eventoId: string;
+  cycleAnchor: string;
+  alertType: AlertType;
+  status: AlertSendStatus;
+  recipientEmails?: string[];
+  sentAt?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

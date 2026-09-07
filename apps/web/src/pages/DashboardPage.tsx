@@ -21,6 +21,7 @@ import {
   AlertCircle,
   FileText,
 } from 'lucide-react';
+import { AlertsOverviewWidget } from '../components/AlertsOverviewWidget';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -302,6 +303,9 @@ export const DashboardPage: React.FC = () => {
           <span>Advertencia: Inconsistencia detectada entre totales de gastos e ingresos.</span>
         </div>
       )}
+
+      {/* PANORAMA VISUAL DE ALERTAS DE MANTENIMIENTO Y VENCIMIENTOS (ETAPA 5C) */}
+      <AlertsOverviewWidget />
 
       {/* TARJETAS KPI (Indicadores Principales) */}
       {summary && (
