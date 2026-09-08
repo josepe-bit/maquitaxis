@@ -475,27 +475,28 @@ export const DashboardPage: React.FC = () => {
         </section>
       )}
 
-      {/* TABLA PRINCIPAL DE RESUMEN MENSUAL */}
+      {/* TABLA PRINCIPAL DE RESUMEN MENSUAL (CUADRO FINANCIERO MENSUAL DE 6 COLUMNAS) */}
       {summary && (
-        <section style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', overflow: 'hidden' }}>
+        <section style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #334155' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-              Resumen Financiero Mensual ({selectedYear})
+              Cuadro Financiero Mensual — Ingresos, Costos y Neto ({selectedYear})
             </h2>
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0.25rem 0 0 0' }}>
+              Desglose detallado mes a mes: Neto = Ingresos — (Control + Mantenimiento + Liquidación)
+            </p>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#0f172a', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.75rem' }}>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>MES</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>INGRESOS</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>CONTROL</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>MANTENIMIENTO</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>LIQUIDACIÓN</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>TOTAL GASTOS</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>NETO</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>RENTABILIDAD</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Mes</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Ingresos — Producción</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Control de eventos</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Mantenimiento del vehículo</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Liquidación del conductor</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Neto</th>
                 </tr>
               </thead>
               <tbody>
@@ -507,17 +508,11 @@ export const DashboardPage: React.FC = () => {
                     <td style={{ padding: '0.75rem 1rem', color: '#10b981', fontWeight: 600 }}>
                       {formatCurrency(m.ingresos)}
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{formatCurrency(m.control)}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{formatCurrency(m.mantenimiento)}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{formatCurrency(m.liquidacion)}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#ef4444', fontWeight: 600 }}>
-                      {formatCurrency(m.totalGastos)}
-                    </td>
+                    <td style={{ padding: '0.75rem 1rem', color: '#38bdf8' }}>{formatCurrency(m.control)}</td>
+                    <td style={{ padding: '0.75rem 1rem', color: '#f59e0b' }}>{formatCurrency(m.mantenimiento)}</td>
+                    <td style={{ padding: '0.75rem 1rem', color: '#a855f7' }}>{formatCurrency(m.liquidacion)}</td>
                     <td style={{ padding: '0.75rem 1rem', color: m.neto >= 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>
                       {formatCurrency(m.neto)}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#f59e0b', fontWeight: 600 }}>
-                      {m.rentabilidad != null ? `${m.rentabilidad.toFixed(1)} %` : 'N/A'}
                     </td>
                   </tr>
                 ))}
@@ -529,12 +524,8 @@ export const DashboardPage: React.FC = () => {
                   <td style={{ padding: '1rem', color: '#38bdf8' }}>{formatCurrency(summary.totalControl)}</td>
                   <td style={{ padding: '1rem', color: '#f59e0b' }}>{formatCurrency(summary.totalMantenimiento)}</td>
                   <td style={{ padding: '1rem', color: '#a855f7' }}>{formatCurrency(summary.totalLiquidacion)}</td>
-                  <td style={{ padding: '1rem', color: '#ef4444' }}>{formatCurrency(summary.totalGastos)}</td>
                   <td style={{ padding: '1rem', color: summary.totalNeto >= 0 ? '#10b981' : '#ef4444' }}>
                     {formatCurrency(summary.totalNeto)}
-                  </td>
-                  <td style={{ padding: '1rem', color: '#f59e0b' }}>
-                    {summary.rentabilidadTotal != null ? `${summary.rentabilidadTotal.toFixed(1)} %` : 'N/A'}
                   </td>
                 </tr>
               </tfoot>
