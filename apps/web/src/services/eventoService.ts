@@ -105,6 +105,8 @@ export const eventoService = {
       monthsInterval: e.months_interval ?? 0,
       appliesBy: (e.applies_by as EventoAppliesBy) || 'kilometros',
       estimatedValue: e.estimated_value ? Number(e.estimated_value) : 0,
+      advanceWarningKms: e.advance_warning_kms ?? 500,
+      advanceWarningDays: e.advance_warning_days ?? 7,
       createdAt: e.created_at || undefined,
       controlsCount: countMap[e.id] || 0,
     }));
@@ -124,6 +126,8 @@ export const eventoService = {
         months_interval: (appliesBy === 'meses' || appliesBy === 'kilometros_y_meses') ? (input.monthsInterval ?? 0) : 0,
         applies_by: appliesBy,
         estimated_value: input.estimatedValue ?? 0,
+        advance_warning_kms: input.advanceWarningKms ?? 500,
+        advance_warning_days: input.advanceWarningDays ?? 7,
       })
       .select()
       .single();
@@ -143,6 +147,8 @@ export const eventoService = {
       monthsInterval: data.months_interval ?? 0,
       appliesBy: (data.applies_by as EventoAppliesBy) || 'kilometros',
       estimatedValue: data.estimated_value ? Number(data.estimated_value) : 0,
+      advanceWarningKms: data.advance_warning_kms ?? 500,
+      advanceWarningDays: data.advance_warning_days ?? 7,
       createdAt: data.created_at || undefined,
     };
   },
@@ -161,6 +167,8 @@ export const eventoService = {
         months_interval: (appliesBy === 'meses' || appliesBy === 'kilometros_y_meses') ? (input.monthsInterval ?? 0) : 0,
         applies_by: appliesBy,
         estimated_value: input.estimatedValue ?? 0,
+        advance_warning_kms: input.advanceWarningKms ?? 500,
+        advance_warning_days: input.advanceWarningDays ?? 7,
       })
       .eq('id', id)
       .select()
@@ -181,6 +189,8 @@ export const eventoService = {
       monthsInterval: data.months_interval ?? 0,
       appliesBy: (data.applies_by as EventoAppliesBy) || 'kilometros',
       estimatedValue: data.estimated_value ? Number(data.estimated_value) : 0,
+      advanceWarningKms: data.advance_warning_kms ?? 500,
+      advanceWarningDays: data.advance_warning_days ?? 7,
       createdAt: data.created_at || undefined,
     };
   },

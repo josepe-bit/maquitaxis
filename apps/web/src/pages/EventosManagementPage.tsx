@@ -42,6 +42,8 @@ export const EventosManagementPage: React.FC = () => {
   const [kmsInterval, setKmsInterval] = useState<string>('5000');
   const [monthsInterval, setMonthsInterval] = useState<string>('6');
   const [estimatedValue, setEstimatedValue] = useState<string>('150000');
+  const [advanceWarningKms, setAdvanceWarningKms] = useState<string>('500');
+  const [advanceWarningDays, setAdvanceWarningDays] = useState<string>('7');
 
   // Modal de confirmación de eliminación
   const [deletingEvento, setDeletingEvento] = useState<EventoWithStats | null>(null);
@@ -74,6 +76,8 @@ export const EventosManagementPage: React.FC = () => {
     setKmsInterval('5000');
     setMonthsInterval('6');
     setEstimatedValue('150000');
+    setAdvanceWarningKms('500');
+    setAdvanceWarningDays('7');
     setFormError(null);
     setShowModal(true);
   };
@@ -85,6 +89,8 @@ export const EventosManagementPage: React.FC = () => {
     setKmsInterval(e.kmsInterval ? e.kmsInterval.toString() : '0');
     setMonthsInterval(e.monthsInterval ? e.monthsInterval.toString() : '0');
     setEstimatedValue(e.estimatedValue ? e.estimatedValue.toString() : '0');
+    setAdvanceWarningKms(String(e.advanceWarningKms ?? 500));
+    setAdvanceWarningDays(String(e.advanceWarningDays ?? 7));
     setFormError(null);
     setShowModal(true);
   };
@@ -116,6 +122,24 @@ export const EventosManagementPage: React.FC = () => {
       }
     }
 
+    let warnKms = 500;
+    if (appliesBy === 'kilometros' || appliesBy === 'kilometros_y_meses') {
+      warnKms = parseInt(advanceWarningKms, 10);
+      if (isNaN(warnKms) || warnKms < 0) {
+        setFormError('El umbral de alerta en kilómetros debe ser un número entero válido mayor o igual a 0.');
+        return;
+      }
+    }
+
+    let warnDays = 7;
+    if (appliesBy === 'meses' || appliesBy === 'kilometros_y_meses') {
+      warnDays = parseInt(advanceWarningDays, 10);
+      if (isNaN(warnDays) || warnDays < 0) {
+        setFormError('El umbral de alerta en días debe ser un número entero válido mayor o igual a 0.');
+        return;
+      }
+    }
+
     const val = parseFloat(estimatedValue);
     if (isNaN(val) || val < 0) {
       setFormError('El valor estimado debe ser un monto numérico válido.');
@@ -131,6 +155,8 @@ export const EventosManagementPage: React.FC = () => {
           kmsInterval: kms,
           monthsInterval: months,
           estimatedValue: val,
+          advanceWarningKms: warnKms,
+          advanceWarningDays: warnDays,
         };
         await eventoService.updateEvento(editingEvento.id, updateInput);
         setFeedback({ type: 'success', message: `Evento "${name.trim()}" actualizado exitosamente.` });
@@ -141,6 +167,8 @@ export const EventosManagementPage: React.FC = () => {
           kmsInterval: kms,
           monthsInterval: months,
           estimatedValue: val,
+          advanceWarningKms: warnKms,
+          advanceWarningDays: warnDays,
         };
         await eventoService.createEvento(createInput);
         setFeedback({ type: 'success', message: `Evento "${name.trim()}" registrado en el catálogo.` });
@@ -847,6 +875,19 @@ export const EventosManagementPage: React.FC = () => {
                       </div>
                     )}
 
+                    {ev.appliesBy !== 'ninguno' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <AlertTriangle size={13} color="#f59e0b" /> Umbral Alerta:
+                        </span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#f59e0b' }}>
+                          {ev.appliesBy === 'kilometros' && `${ev.advanceWarningKms ?? 500} km antes`}
+                          {ev.appliesBy === 'meses' && `${ev.advanceWarningDays ?? 7} días antes`}
+                          {ev.appliesBy === 'kilometros_y_meses' && `${ev.advanceWarningKms ?? 500} km / ${ev.advanceWarningDays ?? 7} días antes`}
+                        </span>
+                      </div>
+                    )}
+
                     {ev.appliesBy === 'ninguno' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Periodicidad:</span>
@@ -1141,6 +1182,45 @@ export const EventosManagementPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Umbral de Alerta en KM (si aplica) */}
+                {(appliesBy === 'kilometros' || appliesBy === 'kilometros_y_meses') && (
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: '#38bdf8',
+                        marginBottom: '0.4rem',
+                      }}
+                    >
+                      Umbral de alerta en kilómetros de anticipación *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="100"
+                      placeholder="Ej: 500 (Avisar 500 km antes)"
+                      value={advanceWarningKms}
+                      onChange={(e) => setAdvanceWarningKms(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--bg-dark)',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.9rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem', display: 'block' }}>
+                      Ej.: 500 km antes del kilometraje programado.
+                    </span>
+                  </div>
+                )}
+
                 {/* Entrada Meses (si aplica) */}
                 {(appliesBy === 'meses' || appliesBy === 'kilometros_y_meses') && (
                   <div>
@@ -1176,6 +1256,45 @@ export const EventosManagementPage: React.FC = () => {
                     />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem', display: 'block' }}>
                       Cada cuántos meses debe realizarse este evento (ej: Tecnomecánica cada 12 meses).
+                    </span>
+                  </div>
+                )}
+
+                {/* Umbral de Alerta en Días (si aplica) */}
+                {(appliesBy === 'meses' || appliesBy === 'kilometros_y_meses') && (
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: '#10b981',
+                        marginBottom: '0.4rem',
+                      }}
+                    >
+                      Umbral de alerta en días de anticipación *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="1"
+                      placeholder="Ej: 7 (Avisar 7 días antes)"
+                      value={advanceWarningDays}
+                      onChange={(e) => setAdvanceWarningDays(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--bg-dark)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.9rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem', display: 'block' }}>
+                      Ej.: 7 días antes de la fecha programada.
                     </span>
                   </div>
                 )}

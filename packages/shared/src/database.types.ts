@@ -299,6 +299,9 @@ export interface Database {
           months_interval: number | null
           applies_by: 'kilometros' | 'meses' | 'kilometros_y_meses' | 'ninguno'
           estimated_value: number | null
+          advance_warning_kms: number | null
+          advance_warning_days: number | null
+          is_active: boolean | null
           created_at: string
         }
         Insert: {
@@ -308,6 +311,9 @@ export interface Database {
           months_interval?: number | null
           applies_by?: 'kilometros' | 'meses' | 'kilometros_y_meses' | 'ninguno'
           estimated_value?: number | null
+          advance_warning_kms?: number | null
+          advance_warning_days?: number | null
+          is_active?: boolean | null
           created_at?: string
         }
         Update: {
@@ -317,6 +323,9 @@ export interface Database {
           months_interval?: number | null
           applies_by?: 'kilometros' | 'meses' | 'kilometros_y_meses' | 'ninguno'
           estimated_value?: number | null
+          advance_warning_kms?: number | null
+          advance_warning_days?: number | null
+          is_active?: boolean | null
           created_at?: string
         }
         Relationships: []
