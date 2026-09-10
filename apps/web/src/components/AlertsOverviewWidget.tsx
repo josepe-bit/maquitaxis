@@ -473,8 +473,11 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
               <th style={{ padding: '0.75rem 1rem' }}>PLACA / TAXI</th>
               <th style={{ padding: '0.75rem 1rem' }}>EVENTO</th>
               <th style={{ padding: '0.75rem 1rem' }}>ESTADO</th>
-              <th style={{ padding: '0.75rem 1rem' }}>KILOMETRAJE ACTUAL / OBJETIVO</th>
-              <th style={{ padding: '0.75rem 1rem' }}>KM RESTANTES</th>
+              <th style={{ padding: '0.75rem 1rem' }}>KM. ACTUAL</th>
+              <th style={{ padding: '0.75rem 1rem' }}>FECHA EVENTO</th>
+              <th style={{ padding: '0.75rem 1rem' }}>KM. REGISTRO EVENTO</th>
+              <th style={{ padding: '0.75rem 1rem' }}>PRÓXIMO CAMBIO</th>
+              <th style={{ padding: '0.75rem 1rem' }}>FALTAN</th>
               <th style={{ padding: '0.75rem 1rem' }}>FECHA OBJETIVO</th>
               <th style={{ padding: '0.75rem 1rem' }}>DÍAS RESTANTES</th>
               <th style={{ padding: '0.75rem 1rem' }}>MOTIVO DE LA ALERTA</th>
@@ -484,13 +487,13 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={12} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                   Cargando panorama de alertas...
                 </td>
               </tr>
             ) : filteredAlerts.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={12} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                   No se encontraron alertas con los filtros seleccionados.
                 </td>
               </tr>
@@ -503,7 +506,7 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
                     backgroundColor: idx % 2 === 0 ? '#1e293b' : '#172033',
                   }}
                 >
-                  {/* Placa */}
+                  {/* 1. Placa / Taxi */}
                   <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#f8fafc' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Car size={15} color="#f59e0b" />
@@ -512,36 +515,53 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
                     {item.model && <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 400 }}>{item.model}</span>}
                   </td>
 
-                  {/* Evento */}
+                  {/* 2. Evento */}
                   <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#38bdf8' }}>
                     {item.eventoName}
                   </td>
 
-                  {/* Estado */}
+                  {/* 3. Estado */}
                   <td style={{ padding: '0.75rem 1rem' }}>
                     {renderStateBadge(item.state)}
                   </td>
 
-                  {/* Kilometraje Actual / Objetivo */}
+                  {/* 4. Km. Actual */}
                   <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
-                    {item.currentMileage != null ? `${item.currentMileage.toLocaleString('es-CO')} km` : 'Sin datos'}
-                    {item.targetMileage != null ? (
-                      <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>
-                        Objetivo: {item.targetMileage.toLocaleString('es-CO')} km
-                      </span>
-                    ) : null}
+                    {item.currentMileage != null ? `${Math.round(item.currentMileage).toLocaleString('es-CO')} km` : '—'}
                   </td>
 
-                  {/* Km Restantes */}
+                  {/* 5. Fecha Evento */}
+                  <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
+                    {item.lastChangeDate ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <Calendar size={13} color="#94a3b8" />
+                        <span>{item.lastChangeDate}</span>
+                      </div>
+                    ) : (
+                      <span style={{ color: '#64748b' }}>—</span>
+                    )}
+                  </td>
+
+                  {/* 6. Km. Registro Evento */}
+                  <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#f8fafc' }}>
+                    {item.lastChangeMileage != null ? `${Math.round(item.lastChangeMileage).toLocaleString('es-CO')} km` : '—'}
+                  </td>
+
+                  {/* 7. Próximo Cambio */}
+                  <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#f59e0b' }}>
+                    {item.targetMileage != null ? `${Math.round(item.targetMileage).toLocaleString('es-CO')} km` : '—'}
+                  </td>
+
+                  {/* 8. Faltan */}
                   <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: item.remainingKms != null && item.remainingKms < 0 ? '#ef4444' : '#f8fafc' }}>
                     {item.remainingKms != null
                       ? item.remainingKms < 0
                         ? `${Math.abs(item.remainingKms).toLocaleString('es-CO')} km excedidos`
                         : `${item.remainingKms.toLocaleString('es-CO')} km`
-                      : 'N/A'}
+                      : '—'}
                   </td>
 
-                  {/* Fecha Objetivo */}
+                  {/* 9. Fecha Objetivo */}
                   <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
                     {item.targetDate ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -549,11 +569,11 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
                         <span>{item.targetDate}</span>
                       </div>
                     ) : (
-                      'Sin fecha'
+                      <span style={{ color: '#64748b' }}>—</span>
                     )}
                   </td>
 
-                  {/* Días Restantes */}
+                  {/* 10. Días Restantes */}
                   <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: item.remainingDays != null && item.remainingDays < 0 ? '#ef4444' : '#f8fafc' }}>
                     {item.remainingDays != null
                       ? item.remainingDays < 0
@@ -562,12 +582,12 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
                       : 'N/A'}
                   </td>
 
-                  {/* Motivo */}
+                  {/* 11. Motivo de la Alerta */}
                   <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontSize: '0.78rem' }}>
                     {item.reason}
                   </td>
 
-                  {/* Conductor */}
+                  {/* 12. Conductor */}
                   <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
                     {item.driverName ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>

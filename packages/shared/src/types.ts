@@ -488,6 +488,8 @@ export interface VehicleAlert {
   driverName?: string | null;
   ownerId?: string | null;
   ownerName?: string | null;
+  lastChangeMileage?: number | null;
+  lastChangeDate?: string | null;
 }
 
 /**

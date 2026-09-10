@@ -49,6 +49,8 @@ export async function getVehicleAlertsOverview(): Promise<AlertsOverviewSummary>
       driverName: row.driver_name || null,
       ownerId: row.owner_id || null,
       ownerName: row.owner_name || null,
+      lastChangeMileage: row.last_change_mileage != null ? Number(row.last_change_mileage) : null,
+      lastChangeDate: row.last_change_date || null,
     };
   });
 
