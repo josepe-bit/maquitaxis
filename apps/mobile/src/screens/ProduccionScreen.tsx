@@ -22,7 +22,11 @@ interface ProduccionScreenProps {
 
 export const ProduccionScreen: React.FC<ProduccionScreenProps> = ({ authData, onBack }) => {
   const { tercero, vehiculo } = authData;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
 
   const [date, setDate] = useState<string>(todayStr);
   const [shift, setShift] = useState<ShiftType>('dia');
