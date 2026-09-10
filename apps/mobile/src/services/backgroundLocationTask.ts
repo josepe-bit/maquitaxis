@@ -14,11 +14,13 @@ interface BackgroundTaskData {
 let lastBgRecordedPosition: GPSPosition | null = null;
 let currentBgSessionId: string | null = null;
 let currentBgVehiculoId: string | null = null;
+let lastBgDbGpsPositionTime: number = 0;
 
 export const setBackgroundTrackingParams = (sessionId: string, vehiculoId: string) => {
   currentBgSessionId = sessionId;
   currentBgVehiculoId = vehiculoId;
   lastBgRecordedPosition = null;
+  lastBgDbGpsPositionTime = 0;
   AsyncStorage.setItem(
     STORAGE_KEYS.ACTIVE_SESSION,
     JSON.stringify({ sessionId, vehiculoId })
@@ -29,6 +31,7 @@ export const clearBackgroundTrackingParams = () => {
   currentBgSessionId = null;
   currentBgVehiculoId = null;
   lastBgRecordedPosition = null;
+  lastBgDbGpsPositionTime = 0;
   AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_SESSION).catch(() => {});
 };
 
@@ -90,20 +93,27 @@ TaskManager.defineTask<BackgroundTaskData>(BACKGROUND_LOCATION_TASK_NAME, async 
   lastBgRecordedPosition = bgPosition;
 
   try {
-    // 1. Insertar en gps_positions
-    await supabase.from('gps_positions').insert({
-      session_id: bgPosition.sessionId,
-      vehiculo_id: bgPosition.vehiculoId,
-      latitude: bgPosition.latitude,
-      longitude: bgPosition.longitude,
-      altitude: bgPosition.altitude,
-      speed: bgPosition.speed,
-      heading: bgPosition.heading,
-      accuracy: bgPosition.accuracy,
-      recorded_at: bgPosition.timestamp,
-    });
+    const now = Date.now();
+    const isMovement = filterResult.isMovement ?? true;
+    const shouldInsertHistory = isMovement || !lastBgDbGpsPositionTime || (now - lastBgDbGpsPositionTime >= 5 * 60 * 1000);
 
-    // 2. Actualizar última posición del vehículo
+    // 1. Insertar en gps_positions si hubo desplazamiento (>=15m) o pasaron 5 min (evita saturar la tabla en reposo)
+    if (shouldInsertHistory) {
+      await supabase.from('gps_positions').insert({
+        session_id: bgPosition.sessionId,
+        vehiculo_id: bgPosition.vehiculoId,
+        latitude: bgPosition.latitude,
+        longitude: bgPosition.longitude,
+        altitude: bgPosition.altitude,
+        speed: bgPosition.speed,
+        heading: bgPosition.heading,
+        accuracy: bgPosition.accuracy,
+        recorded_at: bgPosition.timestamp,
+      });
+      lastBgDbGpsPositionTime = now;
+    }
+
+    // 2. SIEMPRE actualizar última posición del vehículo (Heartbeat a Supabase Realtime)
     await supabase
       .from('vehiculos')
       .update({

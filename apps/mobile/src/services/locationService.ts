@@ -19,6 +19,7 @@ class LocationService {
   private currentSessionId: string | null = null;
   private currentVehiculoId: string | null = null;
   private updateListeners: LocationUpdateHandler[] = [];
+  private lastDbGpsPositionTime: number = 0;
 
   /**
    * Solicita permisos de ubicación en primer plano y segundo plano
@@ -65,27 +66,28 @@ class LocationService {
     this.currentSessionId = sessionId;
     this.currentVehiculoId = vehiculoId;
     this.lastRecordedPosition = null;
+    this.lastDbGpsPositionTime = 0;
 
     setBackgroundTrackingParams(sessionId, vehiculoId);
 
-    // 1. Suscribirse a cambios de posición del GPS nativo en primer plano
+    // 1. Suscribirse a cambios de posición del GPS nativo en primer plano (distanceInterval 0 para recibir callbacks en reposo)
     this.locationSubscription = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
-        timeInterval: 5000, // Comprobar sensor cada 5 segundos
-        distanceInterval: 5,  // Notificar al sensor cada 5 metros
+        timeInterval: 5000, // Comprobar sensor cada 5 segundos en primer plano
+        distanceInterval: 0, // 0m para que el SO no bloquee los callbacks cuando el vehículo está detenido
       },
       (location) => this.handleIncomingLocation(location)
     );
 
-    // 2. Iniciar seguimiento nativo en segundo plano si está disponible
+    // 2. Iniciar seguimiento nativo en segundo plano si está disponible (30s interval, distanceInterval 0)
     try {
       const isRegistered = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
       if (!isRegistered) {
         await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
           accuracy: Location.Accuracy.High,
-          timeInterval: 10000,
-          distanceInterval: 10,
+          timeInterval: 30000, // Cambiado de 10s a 30s
+          distanceInterval: 0, // 0m para recibir heartbeat temporal aunque el vehículo no se mueva
           showsBackgroundLocationIndicator: true,
           foregroundService: {
             notificationTitle: '🚕 MaquiTaxis GPS Activo',
@@ -141,32 +143,39 @@ class LocationService {
     this.updateListeners.forEach((listener) => listener(newGpsPosition, filterResult.reason));
 
     // Enviar a Supabase PostgreSQL (o guardar en cola local offline)
-    await this.persistGpsPosition(newGpsPosition);
+    await this.persistGpsPosition(newGpsPosition, filterResult.isMovement ?? true);
   }
 
   /**
    * Guardar la posición en Supabase y actualizar la posición actual del taxi
    */
-  private async persistGpsPosition(position: GPSPosition): Promise<void> {
+  private async persistGpsPosition(position: GPSPosition, isMovement: boolean = true): Promise<void> {
     try {
-      // 1. Insertar lectura en gps_positions
-      const { error: insertError } = await supabase.from('gps_positions').insert({
-        session_id: position.sessionId,
-        vehiculo_id: position.vehiculoId,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        altitude: position.altitude,
-        speed: position.speed,
-        heading: position.heading,
-        accuracy: position.accuracy,
-        recorded_at: position.timestamp,
-      });
+      const now = Date.now();
+      const shouldInsertHistory = isMovement || !this.lastDbGpsPositionTime || (now - this.lastDbGpsPositionTime >= 5 * 60 * 1000);
 
-      if (insertError) {
-        throw insertError;
+      // 1. Insertar lectura en gps_positions si hubo movimiento (>=15m) o han transcurrido 5 min (evita saturar la tabla en reposo)
+      if (shouldInsertHistory) {
+        const { error: insertError } = await supabase.from('gps_positions').insert({
+          session_id: position.sessionId,
+          vehiculo_id: position.vehiculoId,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          altitude: position.altitude,
+          speed: position.speed,
+          heading: position.heading,
+          accuracy: position.accuracy,
+          recorded_at: position.timestamp,
+        });
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        this.lastDbGpsPositionTime = now;
       }
 
-      // 2. Actualizar última ubicación en la tabla vehiculos
+      // 2. SIEMPRE actualizar la última ubicación en la tabla vehiculos (Heartbeat de señal viva a Supabase Realtime)
       await supabase
         .from('vehiculos')
         .update({

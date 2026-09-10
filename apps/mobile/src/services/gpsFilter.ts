@@ -31,13 +31,15 @@ export const gpsFilterService = {
     accuracy: number | undefined,
     currentTimestampMs: number = Date.now(),
     config: GPSConfig = DEFAULT_GPS_CONFIG
-  ): { shouldRecord: boolean; reason: string; distanceMeters: number } {
+  ): { shouldRecord: boolean; reason: string; distanceMeters: number; isMovement?: boolean; isLiveness?: boolean } {
     // 1. Filtrar por Precisión (Rechazar si el margen de error es muy alto)
     if (accuracy && accuracy > config.minAccuracyMeters) {
       return {
         shouldRecord: false,
         reason: `Precisión pobre (${Math.round(accuracy)}m > ${config.minAccuracyMeters}m)`,
         distanceMeters: 0,
+        isMovement: false,
+        isLiveness: false,
       };
     }
 
@@ -47,6 +49,8 @@ export const gpsFilterService = {
         shouldRecord: true,
         reason: 'Primera posición de la sesión',
         distanceMeters: 0,
+        isMovement: true,
+        isLiveness: false,
       };
     }
 
@@ -68,6 +72,8 @@ export const gpsFilterService = {
         shouldRecord: true,
         reason: `Desplazamiento suficiente (${Math.round(distanceMeters)}m >= ${config.minDistanceMeters}m)`,
         distanceMeters,
+        isMovement: true,
+        isLiveness: false,
       };
     }
 
@@ -77,6 +83,8 @@ export const gpsFilterService = {
         shouldRecord: true,
         reason: `Señal de liveness por tiempo (${elapsedSeconds}s >= ${config.maxIntervalSeconds}s)`,
         distanceMeters,
+        isMovement: false,
+        isLiveness: true,
       };
     }
 
@@ -85,6 +93,8 @@ export const gpsFilterService = {
       shouldRecord: false,
       reason: `Posición idéntica/cercana (${Math.round(distanceMeters)}m < ${config.minDistanceMeters}m y ${elapsedSeconds}s < ${config.maxIntervalSeconds}s)`,
       distanceMeters,
+      isMovement: false,
+      isLiveness: false,
     };
   },
 };
