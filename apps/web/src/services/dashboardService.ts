@@ -145,7 +145,7 @@ export async function getDashboardFinancialSummary(
   // 1. Consultar Registros de Producción (Ingresos)
   let produccionQuery = supabase
     .from('produccion')
-    .select('id, vehiculo_id, driver_id, date, amount, status')
+    .select('id, vehiculo_id, driver_id, date, amount, deduction, status')
     .gte('date', startDate)
     .lte('date', endDate);
 
@@ -250,7 +250,8 @@ export async function getDashboardFinancialSummary(
     if (p.date) {
       const month = new Date(p.date + 'T00:00:00').getMonth();
       if (month >= 0 && month < 12) {
-        monthlyIngresos[month] += Number(p.amount || 0);
+        const netProd = Number(p.amount || 0) - Number(p.deduction || 0);
+        monthlyIngresos[month] += netProd;
       }
     }
   });

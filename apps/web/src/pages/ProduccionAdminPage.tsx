@@ -59,6 +59,7 @@ export const ProduccionAdminPage: React.FC = () => {
   const [formDate, setFormDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [formStatus, setFormStatus] = useState<ProductionStatus>('trabajo');
   const [formAmount, setFormAmount] = useState<string>('0');
+  const [formDeduction, setFormDeduction] = useState<string>('0');
   const [formSavingsAmount, setFormSavingsAmount] = useState<string>('0');
   const [formMileage, setFormMileage] = useState<string>('0');
 
@@ -127,6 +128,7 @@ export const ProduccionAdminPage: React.FC = () => {
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormShift('dia');
     setFormStatus('trabajo');
+    setFormDeduction('0');
     setFormError(null);
 
     let defaultVehiculoId = vehiculos.length > 0 ? vehiculos[0].id : '';
@@ -137,6 +139,7 @@ export const ProduccionAdminPage: React.FC = () => {
     } else {
       setFormDriverId('');
       setFormAmount('0');
+      setFormDeduction('0');
       setFormSavingsAmount('0');
       setFormMileage('0');
     }
@@ -153,6 +156,7 @@ export const ProduccionAdminPage: React.FC = () => {
     setFormDriverId(p.driverId || '');
     setFormStatus(p.status);
     setFormAmount(p.amount ? p.amount.toString() : '0');
+    setFormDeduction(p.deduction ? p.deduction.toString() : '0');
     setFormSavingsAmount(p.savingsAmount ? p.savingsAmount.toString() : '0');
     setFormMileage(p.mileage ? p.mileage.toString() : '0');
     setFormError(null);
@@ -163,6 +167,7 @@ export const ProduccionAdminPage: React.FC = () => {
   const autoFillShiftConfig = async (vehiculoId: string, shift: ShiftType, currentStatus: ProductionStatus) => {
     if (currentStatus !== 'trabajo') {
       setFormAmount('0');
+      setFormDeduction('0');
       setFormSavingsAmount('0');
       return;
     }
@@ -201,6 +206,7 @@ export const ProduccionAdminPage: React.FC = () => {
       autoFillShiftConfig(formVehiculoId, formShift, newStatus);
     } else {
       setFormAmount('0');
+      setFormDeduction('0');
       setFormSavingsAmount('0');
     }
   };
@@ -220,11 +226,16 @@ export const ProduccionAdminPage: React.FC = () => {
     }
 
     const amt = parseFloat(formAmount) || 0;
+    const ded = parseFloat(formDeduction) || 0;
     const sav = parseFloat(formSavingsAmount) || 0;
     const mil = parseInt(formMileage, 10) || 0;
 
     if (formStatus === 'trabajo' && amt < 0) {
       setFormError('El valor de la cuota no puede ser negativo.');
+      return;
+    }
+    if (formStatus === 'trabajo' && ded < 0) {
+      setFormError('El valor de la deducción no puede ser negativo.');
       return;
     }
 
@@ -239,7 +250,7 @@ export const ProduccionAdminPage: React.FC = () => {
           status: formStatus,
           amount: amt,
           savingsAmount: sav,
-          deduction: 0,
+          deduction: ded,
           mileage: mil,
         };
         await produccionService.updateProduccion(editingProduccion.id, updateInput);
@@ -256,7 +267,7 @@ export const ProduccionAdminPage: React.FC = () => {
           status: formStatus,
           amount: amt,
           savingsAmount: sav,
-          deduction: 0,
+          deduction: ded,
           mileage: mil,
         };
         await produccionService.createProduccion(createInput);
@@ -373,8 +384,9 @@ export const ProduccionAdminPage: React.FC = () => {
 
   // Métricas Consolidadas
   const totalBaseCuotas = producciones.reduce((acc, p) => acc + (p.status === 'trabajo' ? p.amount : 0), 0);
+  const totalDeducciones = producciones.reduce((acc, p) => acc + (p.status === 'trabajo' ? (p.deduction || 0) : 0), 0);
   const totalSavings = producciones.reduce((acc, p) => acc + (p.status === 'trabajo' ? p.savingsAmount : 0), 0);
-  const totalHandedCash = totalBaseCuotas + totalSavings;
+  const totalHandedCash = (totalBaseCuotas - totalDeducciones) + totalSavings;
 
   const countTrabajo = producciones.filter((p) => p.status === 'trabajo').length;
   const countPicoPlaca = producciones.filter((p) => p.status === 'pico_y_placa').length;
@@ -688,6 +700,7 @@ export const ProduccionAdminPage: React.FC = () => {
                   <th style={{ padding: '0.85rem 1.25rem' }}>Conductor del Turno</th>
                   <th style={{ padding: '0.85rem 1.25rem' }}>Estado</th>
                   <th style={{ padding: '0.85rem 1.25rem' }}>Cuota Taxi</th>
+                  <th style={{ padding: '0.85rem 1.25rem' }}>Deducción</th>
                   <th style={{ padding: '0.85rem 1.25rem' }}>Ahorro Conductor</th>
                   <th style={{ padding: '0.85rem 1.25rem' }}>Efectivo Recibido</th>
                   <th style={{ padding: '0.85rem 1.25rem' }}>Km Final</th>
@@ -697,7 +710,8 @@ export const ProduccionAdminPage: React.FC = () => {
               <tbody>
                 {producciones.map((p) => {
                   const isWorking = p.status === 'trabajo';
-                  const handedCash = isWorking ? p.amount + p.savingsAmount : 0;
+                  const netCuota = isWorking ? Math.max(0, p.amount - (p.deduction || 0)) : 0;
+                  const handedCash = isWorking ? netCuota + p.savingsAmount : 0;
                   const driverName = p.driver?.name || p.vehiculo?.driver?.name || 'Histórico / No especificado';
                   const isDay = p.shift === 'dia';
 
@@ -758,6 +772,9 @@ export const ProduccionAdminPage: React.FC = () => {
                       </td>
                       <td style={{ padding: '1rem 1.25rem', fontWeight: isWorking ? '600' : 'normal', color: isWorking ? '#34d399' : 'var(--text-secondary)' }}>
                         {isWorking ? formatCurrency(p.amount) : '$0'}
+                      </td>
+                      <td style={{ padding: '1rem 1.25rem', fontWeight: isWorking && (p.deduction || 0) > 0 ? '700' : 'normal', color: isWorking && (p.deduction || 0) > 0 ? '#f87171' : 'var(--text-secondary)' }}>
+                        {isWorking && (p.deduction || 0) > 0 ? `-${formatCurrency(p.deduction)}` : '$0'}
                       </td>
                       <td style={{ padding: '1rem 1.25rem', fontWeight: isWorking && p.savingsAmount > 0 ? '700' : 'normal', color: isWorking && p.savingsAmount > 0 ? '#38bdf8' : 'var(--text-secondary)' }}>
                         {isWorking && p.savingsAmount > 0 ? formatCurrency(p.savingsAmount) : '$0'}
@@ -1007,6 +1024,19 @@ export const ProduccionAdminPage: React.FC = () => {
                         required
                         value={formAmount}
                         onChange={(e) => setFormAmount(e.target.value)}
+                        style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                        Deducción por Gastos del Taxi ($)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formDeduction}
+                        onChange={(e) => setFormDeduction(e.target.value)}
                         style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
