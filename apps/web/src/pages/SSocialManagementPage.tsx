@@ -30,7 +30,9 @@ import {
 } from 'lucide-react';
 
 export const SSocialManagementPage: React.FC = () => {
-  const { tercero } = useAuth();
+  const { tercero, rol, servicio } = useAuth();
+  const targetServicioId = rol === 'NIVEL_2' ? servicio?.id ?? null : null;
+
   const [ssocialRecords, setSsocialRecords] = useState<SeguridadSocial[]>([]);
   const [drivers, setDrivers] = useState<Tercero[]>([]);
   const [meses, setMeses] = useState<Mes[]>([]);
@@ -61,7 +63,7 @@ export const SSocialManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [rol, servicio?.id]);
 
   useEffect(() => {
     loadSSocialRecords();
@@ -70,7 +72,7 @@ export const SSocialManagementPage: React.FC = () => {
   const loadInitialData = async () => {
     try {
       const [dList, mList, evento] = await Promise.all([
-        ssocialService.fetchDrivers(),
+        ssocialService.fetchDrivers(targetServicioId),
         ssocialService.fetchMeses(),
         ssocialService.fetchOrCreateSSEvento(),
       ]);
@@ -93,7 +95,8 @@ export const SSocialManagementPage: React.FC = () => {
       const mesFilterId = selectedMesFilter ? parseInt(selectedMesFilter, 10) : undefined;
       const list = await ssocialService.fetchSSocialRecords(
         selectedDriverFilter || undefined,
-        mesFilterId
+        mesFilterId,
+        targetServicioId
       );
       setSsocialRecords(list);
     } catch (err: any) {

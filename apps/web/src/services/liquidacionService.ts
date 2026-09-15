@@ -10,7 +10,12 @@ export const liquidacionService = {
   /**
    * Obtener registros de liquidación de prestaciones sociales de conductores
    */
-  async fetchLiquidaciones(driverId?: string, startDate?: string, endDate?: string): Promise<LiquidacionConductor[]> {
+  async fetchLiquidaciones(
+    driverId?: string,
+    startDate?: string,
+    endDate?: string,
+    servicioId?: string | null
+  ): Promise<LiquidacionConductor[]> {
     let query = supabase
       .from('liquidacion')
       .select(`
@@ -27,7 +32,22 @@ export const liquidacionService = {
 
     if (driverId && driverId.trim() !== '') {
       query = query.eq('tercero_id', driverId);
+    } else if (servicioId) {
+      const { data: companyVehicles } = await supabase
+        .from('vehiculos')
+        .select('driver_id')
+        .eq('servicio_id', servicioId);
+      const companyDriverIds = (companyVehicles || [])
+        .map((v: any) => v.driver_id)
+        .filter((id: string | null) => Boolean(id));
+
+      if (companyDriverIds.length > 0) {
+        query = query.in('tercero_id', companyDriverIds);
+      } else {
+        query = query.in('tercero_id', ['00000000-0000-0000-0000-000000000000']);
+      }
     }
+
     if (startDate) {
       query = query.gte('payment_date', startDate);
     }
@@ -68,12 +88,30 @@ export const liquidacionService = {
   /**
    * Obtener conductores registrados
    */
-  async fetchDrivers(): Promise<Tercero[]> {
-    const { data, error } = await supabase
+  async fetchDrivers(servicioId?: string | null): Promise<Tercero[]> {
+    let query = supabase
       .from('terceros')
       .select('*')
       .eq('is_driver', true)
       .order('name', { ascending: true });
+
+    if (servicioId) {
+      const { data: companyVehicles } = await supabase
+        .from('vehiculos')
+        .select('driver_id')
+        .eq('servicio_id', servicioId);
+      const companyDriverIds = (companyVehicles || [])
+        .map((v: any) => v.driver_id)
+        .filter((id: string | null) => Boolean(id));
+
+      if (companyDriverIds.length > 0) {
+        query = query.in('id', companyDriverIds);
+      } else {
+        query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
+      }
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching drivers for liquidacion:', error);

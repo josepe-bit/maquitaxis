@@ -22,6 +22,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { AlertsOverviewWidget } from '../components/AlertsOverviewWidget';
+import { useAuth } from '../context/AuthContext';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -32,6 +33,9 @@ function formatCurrency(amount: number): string {
 }
 
 export const DashboardPage: React.FC = () => {
+  const { rol, servicio } = useAuth();
+  const targetServicioId = rol === 'NIVEL_2' ? servicio?.id ?? null : null;
+
   const [filterOptions, setFilterOptions] = useState<DashboardFilterOptions | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedVehiculo, setSelectedVehiculo] = useState<string>('todos');
@@ -44,7 +48,7 @@ export const DashboardPage: React.FC = () => {
 
   // Cargar opciones de filtros iniciales
   useEffect(() => {
-    getDashboardFilterOptions()
+    getDashboardFilterOptions(targetServicioId)
       .then((options) => {
         setFilterOptions(options);
         if (options.years.length > 0 && !options.years.includes(selectedYear)) {
@@ -54,7 +58,7 @@ export const DashboardPage: React.FC = () => {
       .catch((err) => {
         console.error('Error cargando filtros:', err);
       });
-  }, []);
+  }, [rol, servicio?.id]);
 
   // Cargar resumen financiero cuando cambian los filtros
   const loadSummaryData = async () => {
@@ -65,7 +69,8 @@ export const DashboardPage: React.FC = () => {
         selectedYear,
         selectedVehiculo,
         selectedDriver,
-        selectedEvento
+        selectedEvento,
+        targetServicioId
       );
       setSummary(data);
     } catch (err: any) {
@@ -78,7 +83,7 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     loadSummaryData();
-  }, [selectedYear, selectedVehiculo, selectedDriver, selectedEvento]);
+  }, [rol, servicio?.id, selectedYear, selectedVehiculo, selectedDriver, selectedEvento]);
 
   // Validación matemática estricta
   const isMathValid = useMemo(() => {

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 export const MantenimientoVehiculoPage: React.FC = () => {
-  const { tercero } = useAuth();
+  const { tercero, rol, servicio } = useAuth();
   const [mantenimientos, setMantenimientos] = useState<MantenimientoTaller[]>([]);
   const [suppliers, setSuppliers] = useState<Tercero[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
@@ -62,7 +62,7 @@ export const MantenimientoVehiculoPage: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [rol, servicio?.id]);
 
   useEffect(() => {
     loadMantenimientos();
@@ -70,9 +70,10 @@ export const MantenimientoVehiculoPage: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
+      const targetServicioId = rol === 'NIVEL_2' ? servicio?.id : null;
       const [sList, vList] = await Promise.all([
         mantenimientoService.fetchSuppliers(),
-        mantenimientoService.fetchVehiculos(),
+        mantenimientoService.fetchVehiculos(targetServicioId),
       ]);
       setSuppliers(sList);
       setVehiculos(vList);

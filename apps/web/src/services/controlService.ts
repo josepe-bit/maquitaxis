@@ -109,8 +109,8 @@ export const controlService = {
   /**
    * Obtener lista de vehículos para autocompletar formulario
    */
-  async fetchVehiculosForControl(): Promise<Vehiculo[]> {
-    const { data, error } = await supabase
+  async fetchVehiculosForControl(servicioId?: string | null): Promise<Vehiculo[]> {
+    let query = supabase
       .from('vehiculos')
       .select(`
         *,
@@ -120,6 +120,12 @@ export const controlService = {
         )
       `)
       .order('plate', { ascending: true });
+
+    if (servicioId) {
+      query = query.eq('servicio_id', servicioId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching vehiculos for control:', error);

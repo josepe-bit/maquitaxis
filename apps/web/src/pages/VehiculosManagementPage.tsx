@@ -3,8 +3,10 @@ import { adminService, CreateVehiculoFullInput, UpdateVehiculoFullInput, Vehicul
 import { servicioAppService } from '../services/servicioAppService';
 import { Vehiculo, Tercero, Marca, ServicioApp, TaxiStatus } from '@maquitaxis/shared';
 import { Car, Plus, Search, Filter, RefreshCw, UserCheck, ShieldCheck, Edit3, Trash2, Eye, AlertTriangle, MapPin, X, Calendar, DollarSign, Clock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const VehiculosManagementPage: React.FC = () => {
+  const { rol, servicio } = useAuth();
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [terceros, setTerceros] = useState<Tercero[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -67,13 +69,14 @@ export const VehiculosManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, rol, servicio?.id]);
 
   const loadData = async () => {
     setLoading(true);
     try {
+      const targetServicioId = rol === 'NIVEL_2' ? servicio?.id : null;
       const [vList, tList, mList, sList] = await Promise.all([
-        adminService.fetchVehiculos(searchQuery, statusFilter),
+        adminService.fetchVehiculos(searchQuery, statusFilter, targetServicioId),
         adminService.fetchTerceros(),
         adminService.fetchMarcas(),
         adminService.fetchServiciosApp(),
@@ -96,9 +99,8 @@ export const VehiculosManagementPage: React.FC = () => {
     const firstOwner = terceros.find((t) => t.isOwner);
     setOwnerId(firstOwner ? firstOwner.id : '');
     setDriverId('');
-    setAffiliatedCompanyId('');
-    
-    setServicioId(serviciosApp[0]?.id || '');
+    const initialServicioId = rol === 'NIVEL_2' ? (servicio?.id || '') : (serviciosApp[0]?.id || '');
+    setServicioId(initialServicioId);
     setMarcaId(marcas[0]?.id || '');
     setDisplacement('1.2L');
     setFuelType('Gasolina/Gas');
@@ -138,7 +140,7 @@ export const VehiculosManagementPage: React.FC = () => {
     setOwnerId(v.ownerId);
     setDriverId(v.driverId || '');
     setAffiliatedCompanyId(v.affiliatedCompanyId || '');
-    setServicioId(v.servicioId);
+    setServicioId(rol === 'NIVEL_2' ? (servicio?.id || v.servicioId) : v.servicioId);
     setMarcaId(v.marcaId || '');
     
     setDisplacement(v.displacement || '1.2L');
@@ -207,7 +209,9 @@ export const VehiculosManagementPage: React.FC = () => {
       setErrorMsg('Debe seleccionar un propietario.');
       return;
     }
-    if (!servicioId) {
+    const effectiveServicioId = rol === 'NIVEL_2' ? (servicio?.id || servicioId) : servicioId;
+
+    if (!effectiveServicioId) {
       setErrorMsg('Debe seleccionar un servicio de la app.');
       return;
     }
@@ -223,7 +227,7 @@ export const VehiculosManagementPage: React.FC = () => {
           ownerId,
           driverId: dayDriverId || driverId || undefined,
           affiliatedCompanyId: affiliatedCompanyId || undefined,
-          servicioId,
+          servicioId: effectiveServicioId,
           marcaId: marcaId || undefined,
           displacement,
           fuelType,
@@ -250,7 +254,7 @@ export const VehiculosManagementPage: React.FC = () => {
           ownerId,
           driverId: dayDriverId || driverId || undefined,
           affiliatedCompanyId: affiliatedCompanyId || undefined,
-          servicioId,
+          servicioId: effectiveServicioId,
           marcaId: marcaId || undefined,
           displacement,
           fuelType,
@@ -647,19 +651,28 @@ export const VehiculosManagementPage: React.FC = () => {
 
                   <div>
                     <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Servicio de la App *</label>
-                    <select
-                      value={servicioId}
-                      onChange={(e) => setServicioId(e.target.value)}
-                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
-                      required
-                    >
-                      <option value="">-- Seleccionar Servicio --</option>
-                      {serviciosApp.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} (Nivel {s.level})
-                        </option>
-                      ))}
-                    </select>
+                    {rol === 'NIVEL_2' ? (
+                      <input
+                        type="text"
+                        value={servicio?.name || 'Mi Empresa'}
+                        disabled
+                        style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--primary)', fontWeight: '700' }}
+                      />
+                    ) : (
+                      <select
+                        value={servicioId}
+                        onChange={(e) => setServicioId(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
+                        required
+                      >
+                        <option value="">-- Seleccionar Servicio --</option>
+                        {serviciosApp.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} (Nivel {s.level})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
               </div>

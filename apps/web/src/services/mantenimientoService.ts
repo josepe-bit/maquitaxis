@@ -110,8 +110,8 @@ export const mantenimientoService = {
   /**
    * Obtener vehículos para el selector
    */
-  async fetchVehiculos(): Promise<Vehiculo[]> {
-    const { data, error } = await supabase
+  async fetchVehiculos(servicioId?: string | null): Promise<Vehiculo[]> {
+    let query = supabase
       .from('vehiculos')
       .select(`
         *,
@@ -121,6 +121,12 @@ export const mantenimientoService = {
         )
       `)
       .order('plate', { ascending: true });
+
+    if (servicioId) {
+      query = query.eq('servicio_id', servicioId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching vehiculos for mantenimiento:', error);

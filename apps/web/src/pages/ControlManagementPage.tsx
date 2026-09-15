@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 export const ControlManagementPage: React.FC = () => {
-  const { tercero } = useAuth();
+  const { tercero, rol, servicio } = useAuth();
   const [controles, setControles] = useState<ControlEvento[]>([]);
   const [eventos, setEventos] = useState<EventoCatalogo[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
@@ -67,7 +67,7 @@ export const ControlManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [rol, servicio?.id]);
 
   useEffect(() => {
     loadControles();
@@ -80,9 +80,10 @@ export const ControlManagementPage: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
+      const targetServicioId = rol === 'NIVEL_2' ? servicio?.id : null;
       const [eList, vList] = await Promise.all([
         controlService.fetchEventosForControl(),
-        controlService.fetchVehiculosForControl(),
+        controlService.fetchVehiculosForControl(targetServicioId),
       ]);
       setEventos(eList);
       setVehiculos(vList);

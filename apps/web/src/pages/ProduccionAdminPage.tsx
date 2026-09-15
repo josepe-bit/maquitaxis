@@ -32,7 +32,9 @@ import {
 } from 'lucide-react';
 
 export const ProduccionAdminPage: React.FC = () => {
-  const { tercero } = useAuth();
+  const { tercero, rol, servicio } = useAuth();
+  const targetServicioId = rol === 'NIVEL_2' ? servicio?.id ?? null : null;
+
   const [producciones, setProducciones] = useState<ProduccionDiaria[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [drivers, setDrivers] = useState<Tercero[]>([]);
@@ -79,7 +81,7 @@ export const ProduccionAdminPage: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [rol, servicio?.id]);
 
   useEffect(() => {
     loadProducciones();
@@ -88,8 +90,8 @@ export const ProduccionAdminPage: React.FC = () => {
   const loadInitialData = async () => {
     try {
       const [vList, dList] = await Promise.all([
-        produccionService.fetchVehiculosForProduction(),
-        liquidacionService.fetchDrivers(),
+        produccionService.fetchVehiculosForProduction(targetServicioId),
+        liquidacionService.fetchDrivers(targetServicioId),
       ]);
       setVehiculos(vList);
       setDrivers(dList);
@@ -107,7 +109,9 @@ export const ProduccionAdminPage: React.FC = () => {
         selectedVehiculoFilter || undefined,
         startDateFilter || undefined,
         endDateFilter || undefined,
-        (selectedShiftFilter as ShiftType) || undefined
+        (selectedShiftFilter as ShiftType) || undefined,
+        undefined,
+        targetServicioId
       );
 
       const filtered = statusFilter

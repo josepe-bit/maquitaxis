@@ -55,9 +55,9 @@ export interface DashboardFilterOptions {
 /**
  * Carga las opciones de filtros disponibles desde los datos reales de Supabase.
  */
-export async function getDashboardFilterOptions(): Promise<DashboardFilterOptions> {
+export async function getDashboardFilterOptions(servicioId?: string | null): Promise<DashboardFilterOptions> {
   // 1. Cargar Vehículos
-  const { data: vehiculosData } = await supabase
+  let vehiculosQuery = supabase
     .from('vehiculos')
     .select(`
       id,
@@ -71,6 +71,12 @@ export async function getDashboardFilterOptions(): Promise<DashboardFilterOption
     `)
     .order('plate', { ascending: true });
 
+  if (servicioId) {
+    vehiculosQuery = vehiculosQuery.eq('servicio_id', servicioId);
+  }
+
+  const { data: vehiculosData } = await vehiculosQuery;
+
   const vehiculos = (vehiculosData || []).map((v: any) => ({
     id: v.id,
     plate: v.plate,
@@ -80,11 +86,25 @@ export async function getDashboardFilterOptions(): Promise<DashboardFilterOption
   }));
 
   // 2. Cargar Conductores (is_driver = true)
-  const { data: conductoresData } = await supabase
+  const companyDriverIds = (vehiculosData || [])
+    .map((v: any) => v.driver_id)
+    .filter((id: string | null) => Boolean(id));
+
+  let conductoresQuery = supabase
     .from('terceros')
     .select('id, name, doc_number')
     .eq('is_driver', true)
     .order('name', { ascending: true });
+
+  if (servicioId) {
+    if (companyDriverIds.length > 0) {
+      conductoresQuery = conductoresQuery.in('id', companyDriverIds);
+    } else {
+      conductoresQuery = conductoresQuery.in('id', ['00000000-0000-0000-0000-000000000000']);
+    }
+  }
+
+  const { data: conductoresData } = await conductoresQuery;
 
   const conductores = (conductoresData || []).map((c: any) => ({
     id: c.id,
@@ -137,10 +157,27 @@ export async function getDashboardFinancialSummary(
   year: number,
   vehiculoId: string = 'todos',
   driverId: string = 'todos',
-  eventoId: string = 'todos'
+  eventoId: string = 'todos',
+  servicioId?: string | null
 ): Promise<DashboardFinancialSummary> {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
+
+  // Cargar IDs de vehículos y conductores de la empresa si es Nivel 2
+  let companyVehicleIds: string[] | null = null;
+  let companyDriverIds: string[] | null = null;
+
+  if (servicioId) {
+    const { data: companyVehicles } = await supabase
+      .from('vehiculos')
+      .select('id, driver_id')
+      .eq('servicio_id', servicioId);
+
+    companyVehicleIds = (companyVehicles || []).map((v: any) => v.id);
+    companyDriverIds = (companyVehicles || [])
+      .map((v: any) => v.driver_id)
+      .filter((id: string | null) => Boolean(id));
+  }
 
   // 1. Consultar Registros de Producción (Ingresos)
   let produccionQuery = supabase
@@ -151,7 +188,14 @@ export async function getDashboardFinancialSummary(
 
   if (vehiculoId !== 'todos') {
     produccionQuery = produccionQuery.eq('vehiculo_id', vehiculoId);
+  } else if (servicioId && companyVehicleIds) {
+    if (companyVehicleIds.length > 0) {
+      produccionQuery = produccionQuery.in('vehiculo_id', companyVehicleIds);
+    } else {
+      produccionQuery = produccionQuery.in('vehiculo_id', ['00000000-0000-0000-0000-000000000000']);
+    }
   }
+
   if (driverId !== 'todos') {
     produccionQuery = produccionQuery.eq('driver_id', driverId);
   }
@@ -180,7 +224,14 @@ export async function getDashboardFinancialSummary(
 
   if (vehiculoId !== 'todos') {
     controlQuery = controlQuery.eq('vehiculo_id', vehiculoId);
+  } else if (servicioId && companyVehicleIds) {
+    if (companyVehicleIds.length > 0) {
+      controlQuery = controlQuery.in('vehiculo_id', companyVehicleIds);
+    } else {
+      controlQuery = controlQuery.in('vehiculo_id', ['00000000-0000-0000-0000-000000000000']);
+    }
   }
+
   if (eventoId !== 'todos') {
     controlQuery = controlQuery.eq('evento_id', eventoId);
   }
@@ -212,6 +263,12 @@ export async function getDashboardFinancialSummary(
 
   if (vehiculoId !== 'todos') {
     mantenimientoQuery = mantenimientoQuery.eq('vehiculo_id', vehiculoId);
+  } else if (servicioId && companyVehicleIds) {
+    if (companyVehicleIds.length > 0) {
+      mantenimientoQuery = mantenimientoQuery.in('vehiculo_id', companyVehicleIds);
+    } else {
+      mantenimientoQuery = mantenimientoQuery.in('vehiculo_id', ['00000000-0000-0000-0000-000000000000']);
+    }
   }
 
   const { data: mantenimientos } = await mantenimientoQuery;
@@ -232,6 +289,12 @@ export async function getDashboardFinancialSummary(
 
   if (driverId !== 'todos') {
     liquidacionQuery = liquidacionQuery.eq('tercero_id', driverId);
+  } else if (servicioId && companyDriverIds) {
+    if (companyDriverIds.length > 0) {
+      liquidacionQuery = liquidacionQuery.in('tercero_id', companyDriverIds);
+    } else {
+      liquidacionQuery = liquidacionQuery.in('tercero_id', ['00000000-0000-0000-0000-000000000000']);
+    }
   }
 
   const { data: liquidaciones } = await liquidacionQuery;

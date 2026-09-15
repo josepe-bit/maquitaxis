@@ -29,7 +29,9 @@ import {
 } from 'lucide-react';
 
 export const LiquidacionConductorPage: React.FC = () => {
-  const { tercero } = useAuth();
+  const { tercero, rol, servicio } = useAuth();
+  const targetServicioId = rol === 'NIVEL_2' ? servicio?.id ?? null : null;
+
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionConductor[]>([]);
   const [drivers, setDrivers] = useState<Tercero[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -60,7 +62,7 @@ export const LiquidacionConductorPage: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [rol, servicio?.id]);
 
   useEffect(() => {
     loadLiquidaciones();
@@ -68,7 +70,7 @@ export const LiquidacionConductorPage: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
-      const dList = await liquidacionService.fetchDrivers();
+      const dList = await liquidacionService.fetchDrivers(targetServicioId);
       setDrivers(dList);
       await loadLiquidaciones();
     } catch (err: any) {
@@ -83,7 +85,8 @@ export const LiquidacionConductorPage: React.FC = () => {
       const list = await liquidacionService.fetchLiquidaciones(
         selectedDriverFilter || undefined,
         startDateFilter || undefined,
-        endDateFilter || undefined
+        endDateFilter || undefined,
+        targetServicioId
       );
       setLiquidaciones(list);
     } catch (err: any) {
