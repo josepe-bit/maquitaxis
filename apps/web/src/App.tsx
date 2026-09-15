@@ -117,7 +117,7 @@ const NAV_CATEGORIES: NavCategory[] = [
 ];
 
 const MainContentLayout: React.FC = () => {
-  const { user, tercero, rol, permisos, loading, logout, hasPermission, changePassword } = useAuth();
+  const { user, tercero, servicio, rol, permisos, loading, logout, hasPermission, changePassword } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveWebTab>('MAP_REALTIME');
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [selectedVehiculoId, setSelectedVehiculoId] = useState<string | undefined>(undefined);
@@ -205,8 +205,10 @@ const MainContentLayout: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Cargar lista de vehículos inicial
-    realtimeService.fetchVehiculos().then((list) => {
+    const targetServicioId = rol === 'NIVEL_2' ? servicio?.id : null;
+
+    // 1. Cargar lista de vehículos inicial (Aisolamiento Multiempresa para Nivel 2)
+    realtimeService.fetchVehiculos(targetServicioId).then((list) => {
       setVehiculos(list);
       if (list.length > 0) {
         setSelectedVehiculoId(list[0].id);
@@ -241,7 +243,7 @@ const MainContentLayout: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user, rol, servicio?.id]);
 
   if (loading) {
     return (

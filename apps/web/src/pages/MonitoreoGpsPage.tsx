@@ -6,8 +6,10 @@ import {
 } from '../services/trackingService';
 import GpsMap from '../components/GpsMap';
 import { Search, RefreshCw, Radio, Car, ShieldAlert, CheckCircle2, Phone } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const MonitoreoGpsPage: React.FC = () => {
+  const { rol, servicio } = useAuth();
   const [vehicles, setVehicles] = useState<ActiveVehicleTracking[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -16,12 +18,13 @@ export const MonitoreoGpsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
 
-  // Cargar lista de vehículos
+  // Cargar lista de vehículos (Aislamiento Multiempresa para Nivel 2)
   const loadData = async () => {
     try {
       setIsLoading(true);
       setErrorMessage(null);
-      const data = await getActiveVehiclesTracking();
+      const targetServicioId = rol === 'NIVEL_2' ? servicio?.id : null;
+      const data = await getActiveVehiclesTracking(targetServicioId);
       setVehicles(data);
     } catch (err: any) {
       console.error('[MonitoreoGpsPage] Error al cargar vehículos:', err);
@@ -46,7 +49,7 @@ export const MonitoreoGpsPage: React.FC = () => {
       unsubscribe();
       setIsRealtimeActive(false);
     };
-  }, []);
+  }, [rol, servicio?.id]);
 
   // Filtrado de vehículos
   const filteredVehicles = useMemo(() => {
@@ -81,16 +84,17 @@ export const MonitoreoGpsPage: React.FC = () => {
   }, [vehicles, selectedVehicleId]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#0f172a' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#0f172a' }}>
       {/* Top Header */}
       <header
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '0.875rem 1.5rem',
+          padding: '0.65rem 1.25rem',
           backgroundColor: '#1e293b',
           borderBottom: '1px solid #334155',
+          flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -148,11 +152,12 @@ export const MonitoreoGpsPage: React.FC = () => {
       </header>
 
       {/* Main Body (Panel lateral + Mapa) */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Panel Lateral Listado */}
         <aside
           style={{
-            width: '380px',
+            width: '360px',
+            flexShrink: 0,
             backgroundColor: '#1e293b',
             borderRight: '1px solid #334155',
             display: 'flex',
@@ -338,7 +343,7 @@ export const MonitoreoGpsPage: React.FC = () => {
         </aside>
 
         {/* Sección del Mapa */}
-        <main style={{ flex: 1, position: 'relative' }}>
+        <main style={{ flex: 1, position: 'relative', width: '100%', height: '100%', minHeight: 0 }}>
           <GpsMap
             vehicles={vehicles}
             selectedVehicleId={selectedVehicleId}

@@ -57,10 +57,16 @@ export const realtimeService = {
   /**
    * Obtener la lista inicial de vehículos registrados en la plataforma
    */
-  async fetchVehiculos(): Promise<Vehiculo[]> {
-    const { data, error } = await supabase
+  async fetchVehiculos(servicioId?: string | null): Promise<Vehiculo[]> {
+    let query = supabase
       .from('vehiculos')
       .select('*, driver:terceros!vehiculos_driver_id_fkey(*)');
+
+    if (servicioId) {
+      query = query.eq('servicio_id', servicioId);
+    }
+
+    const { data, error } = await query;
 
     if (error || !data) {
       return [];

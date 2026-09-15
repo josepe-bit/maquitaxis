@@ -499,11 +499,15 @@ export const adminService = {
   /**
    * Cargar lista completa de Vehículos / Taxis con filtros opcionales
    */
-  async fetchVehiculos(searchQuery?: string, statusFilter?: string): Promise<Vehiculo[]> {
+  async fetchVehiculos(searchQuery?: string, statusFilter?: string, servicioId?: string | null): Promise<Vehiculo[]> {
     let query = supabase
       .from('vehiculos')
       .select('*, driver:terceros!vehiculos_driver_id_fkey(*), owner:terceros!vehiculos_owner_id_fkey(*), affiliated_company:terceros!vehiculos_affiliated_company_id_fkey(*), marca:marcas(*), servicio:servicios(*)')
       .order('plate', { ascending: true });
+
+    if (servicioId) {
+      query = query.eq('servicio_id', servicioId);
+    }
 
     if (searchQuery && searchQuery.trim().length > 0) {
       const q = `%${searchQuery.trim()}%`;

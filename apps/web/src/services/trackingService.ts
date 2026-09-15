@@ -21,9 +21,9 @@ export interface ActiveVehicleTracking {
 /**
  * Carga los vehículos activos o con ubicación conocida desde Supabase.
  */
-export async function getActiveVehiclesTracking(): Promise<ActiveVehicleTracking[]> {
+export async function getActiveVehiclesTracking(servicioId?: string | null): Promise<ActiveVehicleTracking[]> {
   // Consultar vehículos con relación a driver (terceros) y tracking_sessions activas
-  const { data: vehiculosData, error } = await supabase
+  let query = supabase
     .from('vehiculos')
     .select(`
       id,
@@ -44,8 +44,14 @@ export async function getActiveVehiclesTracking(): Promise<ActiveVehicleTracking
         id,
         status
       )
-    `)
-    .order('plate', { ascending: true });
+    `);
+
+  // Aislamiento Multiempresa para Nivel 2: Filtrar por empresa/servicio si se especifica
+  if (servicioId) {
+    query = query.eq('servicio_id', servicioId);
+  }
+
+  const { data: vehiculosData, error } = await query.order('plate', { ascending: true });
 
   if (error) {
     console.error('[trackingService] Error al obtener vehículos:', error);
