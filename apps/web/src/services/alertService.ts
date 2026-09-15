@@ -5,7 +5,7 @@ import type { VehicleAlert, AlertsOverviewSummary, AlertState, EventoAppliesBy }
  * Servicio frontend para consultar el panorama de alertas mediante el RPC seguro get_vehicle_event_alerts()
  * El backend es la única autoridad de seguridad (auth.uid()).
  */
-export async function getVehicleAlertsOverview(): Promise<AlertsOverviewSummary> {
+export async function getVehicleAlertsOverview(servicioId?: string | null): Promise<AlertsOverviewSummary> {
   const { data, error } = await (supabase as any).rpc('get_vehicle_event_alerts');
 
   if (error) {
@@ -13,7 +13,17 @@ export async function getVehicleAlertsOverview(): Promise<AlertsOverviewSummary>
     throw new Error(error.message || 'No se pudo obtener el panorama de alertas');
   }
 
-  const rawRows = (data || []) as any[];
+  let rawRows = (data || []) as any[];
+
+  if (servicioId) {
+    const { data: companyVehicles } = await supabase
+      .from('vehiculos')
+      .select('id')
+      .eq('servicio_id', servicioId);
+
+    const companyVehicleIds = new Set((companyVehicles || []).map((v: any) => v.id));
+    rawRows = rawRows.filter((row: any) => companyVehicleIds.has(row.vehiculo_id));
+  }
 
   let vencidos = 0;
   let proximos = 0;

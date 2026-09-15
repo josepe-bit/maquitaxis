@@ -19,9 +19,15 @@ import {
 
 interface AlertsOverviewWidgetProps {
   onRefreshFinished?: () => void;
+  targetServicioId?: string | null;
+  rol?: string | null;
 }
 
-export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRefreshFinished }) => {
+export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({
+  onRefreshFinished,
+  targetServicioId,
+  rol,
+}) => {
   const [data, setData] = useState<AlertsOverviewSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,10 +40,13 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const loadAlerts = async () => {
+    if (rol === 'NIVEL_2' && !targetServicioId) {
+      return;
+    }
     try {
       setIsLoading(true);
       setErrorMessage(null);
-      const res = await getVehicleAlertsOverview();
+      const res = await getVehicleAlertsOverview(targetServicioId);
       setData(res);
       if (onRefreshFinished) onRefreshFinished();
     } catch (err: any) {
@@ -49,8 +58,11 @@ export const AlertsOverviewWidget: React.FC<AlertsOverviewWidgetProps> = ({ onRe
   };
 
   useEffect(() => {
+    if (rol === 'NIVEL_2' && !targetServicioId) {
+      return;
+    }
     loadAlerts();
-  }, []);
+  }, [rol, targetServicioId]);
 
   // Lista de vehículos únicos para el filtro
   const uniqueVehicles = useMemo(() => {

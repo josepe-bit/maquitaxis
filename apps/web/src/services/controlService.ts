@@ -5,7 +5,11 @@ export const controlService = {
   /**
    * Obtener todos los registros de control de eventos ejecutados en vehículos
    */
-  async fetchControles(vehiculoId?: string, eventoId?: string): Promise<ControlEvento[]> {
+  async fetchControles(
+    vehiculoId?: string,
+    eventoId?: string,
+    servicioId?: string | null
+  ): Promise<ControlEvento[]> {
     let query = supabase
       .from('control')
       .select(`
@@ -32,7 +36,20 @@ export const controlService = {
 
     if (vehiculoId && vehiculoId.trim() !== '') {
       query = query.eq('vehiculo_id', vehiculoId);
+    } else if (servicioId) {
+      const { data: companyVehicles } = await supabase
+        .from('vehiculos')
+        .select('id')
+        .eq('servicio_id', servicioId);
+      const companyVehicleIds = (companyVehicles || []).map((v: any) => v.id);
+
+      if (companyVehicleIds.length > 0) {
+        query = query.in('vehiculo_id', companyVehicleIds);
+      } else {
+        query = query.in('vehiculo_id', ['00000000-0000-0000-0000-000000000000']);
+      }
     }
+
     if (eventoId && eventoId.trim() !== '') {
       query = query.eq('evento_id', eventoId);
     }

@@ -71,7 +71,7 @@ export const ControlManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadControles();
-  }, [selectedVehiculoFilter, selectedEventoFilter]);
+  }, [selectedVehiculoFilter, selectedEventoFilter, rol, servicio?.id]);
 
   // Recalcular Próximo Cambio en Vivo al modificar Evento, Fecha o Kilometraje
   useEffect(() => {
@@ -95,11 +95,16 @@ export const ControlManagementPage: React.FC = () => {
   };
 
   const loadControles = async () => {
+    if (rol === 'NIVEL_2' && !servicio?.id) {
+      return;
+    }
     setLoading(true);
     try {
+      const targetServicioId = rol === 'NIVEL_2' ? servicio?.id ?? null : null;
       const list = await controlService.fetchControles(
         selectedVehiculoFilter || undefined,
-        selectedEventoFilter || undefined
+        selectedEventoFilter || undefined,
+        targetServicioId
       );
       setControles(list);
     } catch (err: any) {

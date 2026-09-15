@@ -48,6 +48,9 @@ export const DashboardPage: React.FC = () => {
 
   // Cargar opciones de filtros iniciales
   useEffect(() => {
+    if (rol === 'NIVEL_2' && !servicio?.id) {
+      return;
+    }
     getDashboardFilterOptions(targetServicioId)
       .then((options) => {
         setFilterOptions(options);
@@ -62,6 +65,9 @@ export const DashboardPage: React.FC = () => {
 
   // Cargar resumen financiero cuando cambian los filtros
   const loadSummaryData = async () => {
+    if (rol === 'NIVEL_2' && !servicio?.id) {
+      return;
+    }
     try {
       setIsLoading(true);
       setErrorMessage(null);
@@ -82,6 +88,9 @@ export const DashboardPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (rol === 'NIVEL_2' && !servicio?.id) {
+      return;
+    }
     loadSummaryData();
   }, [rol, servicio?.id, selectedYear, selectedVehiculo, selectedDriver, selectedEvento]);
 
@@ -310,7 +319,7 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* PANORAMA VISUAL DE ALERTAS DE MANTENIMIENTO Y VENCIMIENTOS (ETAPA 5C) */}
-      <AlertsOverviewWidget />
+      <AlertsOverviewWidget targetServicioId={targetServicioId} rol={rol} />
 
       {/* TARJETAS KPI (Indicadores Principales) */}
       {summary && (
