@@ -163,7 +163,17 @@ export const authDriverService = {
     }
 
     if (!tercero.is_driver && !tercero.is_owner) {
-      return null;
+      const { data: adminService } = await supabase
+        .from('servicios')
+        .select('id')
+        .eq('tercero_id', tercero.id)
+        .eq('status', 'activo')
+        .eq('level', 1)
+        .maybeSingle();
+
+      if (!adminService) {
+        return null;
+      }
     }
 
     const vehiculo = await this.fetchAssignedVehicle(tercero.id);

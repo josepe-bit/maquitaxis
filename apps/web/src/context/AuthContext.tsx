@@ -234,13 +234,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
       }
 
-      // Validar que si se ingresó documento, coincida exactamente
+      // Notificar discrepancia de documento de entrada sin destruir la sesión de un usuario ya vinculado por user_id
       if (docNumberInput && docNumberInput.trim() !== '' && terceroRow.doc_number.trim() !== docNumberInput.trim()) {
-        await supabaseClient.auth.signOut();
-        return {
-          success: false,
-          message: 'El documento de identificación no coincide con la cuenta ingresada.',
-        };
+        console.warn(`[AuthContext] Discrepancia menor en documento: digitado '${docNumberInput.trim()}', registrado '${terceroRow.doc_number.trim()}'`);
       }
 
       // 3. Validar Estado de Aprobación de Acceso (access_status)

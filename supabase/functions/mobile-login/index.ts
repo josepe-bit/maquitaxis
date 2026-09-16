@@ -86,7 +86,21 @@ serve(async (req) => {
         );
       }
 
-      if (tercero.access_status !== 'approved' || (!tercero.is_driver && !tercero.is_owner)) {
+      let isAllowedMobile = tercero.is_driver || tercero.is_owner;
+      if (!isAllowedMobile) {
+        const { data: adminServ } = await adminClient
+          .from('servicios')
+          .select('id')
+          .eq('tercero_id', tercero.id)
+          .eq('status', 'activo')
+          .eq('level', 1)
+          .maybeSingle();
+        if (adminServ) {
+          isAllowedMobile = true;
+        }
+      }
+
+      if (tercero.access_status !== 'approved' || !isAllowedMobile) {
         return new Response(JSON.stringify({ error: 'Invalid login credentials' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
