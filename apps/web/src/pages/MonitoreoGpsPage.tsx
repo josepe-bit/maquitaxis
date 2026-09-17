@@ -5,8 +5,10 @@ import {
   type ActiveVehicleTracking,
 } from '../services/trackingService';
 import GpsMap from '../components/GpsMap';
-import { Search, RefreshCw, Radio, Car, ShieldAlert, CheckCircle2, Phone } from 'lucide-react';
+import { Search, RefreshCw, Radio, Car, ShieldAlert, CheckCircle2, Phone, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { webGpsCommandService } from '../services/gpsCommandService';
+import type { GpsCommand, GpsCommandType } from '@maquitaxis/shared';
 
 /** Umbral técnico de obsolescencia GPS (3 minutos) */
 const STALE_THRESHOLD_MS = 3 * 60 * 1000;
@@ -67,7 +69,7 @@ function getGpsStatus(lat: number | null, lng: number | null, lastLocationAt: st
 }
 
 export const MonitoreoGpsPage: React.FC = () => {
-  const { rol, servicio } = useAuth();
+  const { rol, servicio, tercero } = useAuth();
   const [vehicles, setVehicles] = useState<ActiveVehicleTracking[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -75,6 +77,12 @@ export const MonitoreoGpsPage: React.FC = () => {
   const [isRealtimeActive, setIsRealtimeActive] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+
+  // Estado para gestión de comandos GPS en el vehículo seleccionado
+  const [activeCommand, setActiveCommand] = useState<GpsCommand | null>(null);
+  const [isCommandSubmitting, setIsCommandSubmitting] = useState<boolean>(false);
+  const [commandActionError, setCommandActionError] = useState<string | null>(null);
+  const [commandTimerWarning, setCommandTimerWarning] = useState<boolean>(false);
 
   // Cargar lista de vehículos (Aislamiento Multiempresa para Nivel 2)
   const loadData = async () => {
@@ -95,7 +103,7 @@ export const MonitoreoGpsPage: React.FC = () => {
   useEffect(() => {
     loadData();
 
-    // Suscribirse a Supabase Realtime
+    // Suscribirse a Supabase Realtime para vehiculos y tracking_sessions
     const unsubscribe = subscribeToTrackingRealtime(() => {
       setIsRealtimeActive(true);
       loadData();
@@ -108,6 +116,71 @@ export const MonitoreoGpsPage: React.FC = () => {
       setIsRealtimeActive(false);
     };
   }, [rol, servicio?.id]);
+
+  // Obtener comando activo y suscribir a Realtime cuando cambia el vehículo seleccionado
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      setActiveCommand(null);
+      setCommandActionError(null);
+      setCommandTimerWarning(false);
+      return;
+    }
+
+    let isMounted = true;
+    setCommandActionError(null);
+    setCommandTimerWarning(false);
+
+    // 1. Consultar si existe un comando 'pending' o 'executing' previo
+    webGpsCommandService
+      .getActiveCommandForVehicle(selectedVehicleId)
+      .then((cmd) => {
+        if (isMounted) {
+          setActiveCommand(cmd);
+        }
+      })
+      .catch((err) => {
+        console.error('[MonitoreoGpsPage] Error consultando comando activo:', err);
+      });
+
+    // 2. Suscribir en tiempo real a la tabla gps_commands para este vehículo
+    const unsubscribeCmd = webGpsCommandService.subscribeToVehicleGpsCommands(
+      selectedVehicleId,
+      (cmd) => {
+        if (!isMounted) return;
+        setActiveCommand(cmd);
+
+        if (cmd.status === 'completed') {
+          loadData();
+          setTimeout(() => {
+            if (isMounted) {
+              setActiveCommand((curr) => (curr?.id === cmd.id ? null : curr));
+            }
+          }, 5000);
+        } else if (cmd.status === 'failed') {
+          loadData();
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribeCmd();
+    };
+  }, [selectedVehicleId]);
+
+  // Temporizador de advertencia si un comando permanece en 'pending' por más de 15 segundos
+  useEffect(() => {
+    if (!activeCommand || activeCommand.status !== 'pending') {
+      setCommandTimerWarning(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCommandTimerWarning(true);
+    }, 15000);
+
+    return () => clearTimeout(timer);
+  }, [activeCommand?.id, activeCommand?.status]);
 
   // Filtrado de vehículos
   const filteredVehicles = useMemo(() => {
@@ -140,6 +213,49 @@ export const MonitoreoGpsPage: React.FC = () => {
   const selectedVehicle = useMemo(() => {
     return vehicles.find((v) => v.vehiculoId === selectedVehicleId);
   }, [vehicles, selectedVehicleId]);
+
+  // Emisión controlada de comandos de control remoto GPS
+  const handleSendGpsCommand = async (commandType: GpsCommandType) => {
+    if (!selectedVehicle) return;
+
+    // A. Validar requested_by (tercero?.id)
+    if (!tercero?.id) {
+      setCommandActionError('No se pudo identificar la cuenta del usuario emisor.');
+      return;
+    }
+
+    // B. Validar conductor asignado (driverId)
+    if (!selectedVehicle.driverId) {
+      setCommandActionError('Este vehículo no tiene un conductor asignado.');
+      return;
+    }
+
+    // C. Validar sesión activa si es ACTIVAR_GPS
+    if (commandType === 'ACTIVAR_GPS' && !selectedVehicle.activeSessionId) {
+      setCommandActionError('El conductor debe tener una sesión de seguimiento activa en la app móvil.');
+      return;
+    }
+
+    try {
+      setIsCommandSubmitting(true);
+      setCommandActionError(null);
+      setCommandTimerWarning(false);
+
+      const createdCmd = await webGpsCommandService.sendGpsCommand(
+        selectedVehicle.vehiculoId,
+        commandType,
+        selectedVehicle.driverId,
+        tercero.id
+      );
+
+      setActiveCommand(createdCmd);
+    } catch (err: any) {
+      console.error('[MonitoreoGpsPage] Error enviando comando GPS:', err);
+      setCommandActionError(err.message || 'Error al enviar orden de control GPS.');
+    } finally {
+      setIsCommandSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#0f172a' }}>
@@ -432,7 +548,7 @@ export const MonitoreoGpsPage: React.FC = () => {
                 border: '1px solid #38bdf8',
                 borderRadius: '0.5rem',
                 padding: '1rem',
-                width: '280px',
+                width: '320px',
                 boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
               }}
             >
@@ -499,6 +615,196 @@ export const MonitoreoGpsPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* SECCIÓN DE CONTROL REMOTO GPS */}
+              <div
+                style={{
+                  marginTop: '0.875rem',
+                  paddingTop: '0.875rem',
+                  borderTop: '1px solid #334155',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc' }}>
+                  <Radio size={14} style={{ color: '#38bdf8' }} />
+                  <span>CONTROL REMOTO GPS</span>
+                </div>
+
+                {/* Mensaje de Error de Acción si existe */}
+                {commandActionError && (
+                  <div
+                    style={{
+                      padding: '0.5rem',
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid #ef4444',
+                      borderRadius: '0.375rem',
+                      color: '#fca5a5',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                    }}
+                  >
+                    <ShieldAlert size={14} style={{ flexShrink: 0 }} />
+                    <span>{commandActionError}</span>
+                  </div>
+                )}
+
+                {/* Estado del Conductor */}
+                {!selectedVehicle.driverId ? (
+                  <div
+                    style={{
+                      padding: '0.5rem',
+                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid #f59e0b',
+                      borderRadius: '0.375rem',
+                      color: '#fcd34d',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                    }}
+                  >
+                    <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                    <span>⚠️ Sin conductor asignado</span>
+                  </div>
+                ) : null}
+
+                {/* Indicador visual de comando activo en progreso */}
+                {activeCommand && (
+                  <div
+                    style={{
+                      padding: '0.5rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.25rem',
+                      backgroundColor:
+                        activeCommand.status === 'completed'
+                          ? 'rgba(16, 185, 129, 0.15)'
+                          : activeCommand.status === 'failed'
+                          ? 'rgba(239, 68, 68, 0.15)'
+                          : 'rgba(56, 189, 248, 0.15)',
+                      border:
+                        activeCommand.status === 'completed'
+                          ? '1px solid #10b981'
+                          : activeCommand.status === 'failed'
+                          ? '1px solid #ef4444'
+                          : '1px solid #38bdf8',
+                      color:
+                        activeCommand.status === 'completed'
+                          ? '#6ee7b7'
+                          : activeCommand.status === 'failed'
+                          ? '#fca5a5'
+                          : '#7dd3fc',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      {activeCommand.status === 'pending' || activeCommand.status === 'executing' ? (
+                        <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                      ) : activeCommand.status === 'completed' ? (
+                        <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                      ) : (
+                        <ShieldAlert size={14} style={{ flexShrink: 0 }} />
+                      )}
+
+                      <span>
+                        {activeCommand.status === 'pending' && '⏳ Comando pendiente de entrega al dispositivo...'}
+                        {activeCommand.status === 'executing' && '⏳ Comando recibido. Ejecutando en el dispositivo...'}
+                        {activeCommand.status === 'completed' && '✅ Comando ejecutado correctamente'}
+                        {activeCommand.status === 'failed' && `❌ No fue posible ejecutar el comando${activeCommand.errorMessage ? `: ${activeCommand.errorMessage}` : ''}`}
+                      </span>
+                    </div>
+
+                    {commandTimerWarning && activeCommand.status === 'pending' && (
+                      <div style={{ fontSize: '0.7rem', color: '#fcd34d', marginTop: '0.15rem' }}>
+                        ⚠️ El dispositivo aún no confirma la recepción.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Botón de Control Remoto según estado del vehículo */}
+                {(() => {
+                  const hasDriver = Boolean(selectedVehicle.driverId);
+                  const hasActiveSession = Boolean(selectedVehicle.activeSessionId);
+                  const isBusy = isCommandSubmitting || activeCommand?.status === 'pending' || activeCommand?.status === 'executing';
+
+                  if (!hasDriver) {
+                    return null;
+                  }
+
+                  if (!hasActiveSession) {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                        <button
+                          disabled={true}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 0.75rem',
+                            backgroundColor: '#334155',
+                            color: '#64748b',
+                            border: '1px solid #475569',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'not-allowed',
+                            width: '100%',
+                          }}
+                        >
+                          🟢 Activar GPS
+                        </button>
+                        <div style={{ fontSize: '0.7rem', color: '#f59e0b', lineHeight: 1.3 }}>
+                          ⚠️ El conductor debe tener una sesión de seguimiento activa en la app móvil.
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                      <button
+                        onClick={() => handleSendGpsCommand('DESACTIVAR_GPS')}
+                        disabled={isBusy}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 0.75rem',
+                          backgroundColor: isBusy ? '#475569' : '#dc2626',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: isBusy ? 'not-allowed' : 'pointer',
+                          width: '100%',
+                          transition: 'background-color 0.15s ease',
+                        }}
+                      >
+                        {isBusy ? (
+                          <>
+                            <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                            <span>Procesando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🔴 Desactivar GPS</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
         </main>
@@ -508,3 +814,4 @@ export const MonitoreoGpsPage: React.FC = () => {
 };
 
 export default MonitoreoGpsPage;
+
