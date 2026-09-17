@@ -856,6 +856,58 @@ export interface Database {
             referencedColumns: ["id"]
           }
         ]
+      },
+      gps_commands: {
+        Row: {
+          id: string
+          vehiculo_id: string
+          driver_tercero_id: string | null
+          command: string
+          status: string
+          requested_by: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+          executed_at: string | null
+        }
+        Insert: {
+          id?: string
+          vehiculo_id: string
+          driver_tercero_id?: string | null
+          command: string
+          status?: string
+          requested_by?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+          executed_at?: string | null
+        }
+        Update: {
+          id?: string
+          vehiculo_id?: string
+          driver_tercero_id?: string | null
+          command?: string
+          status?: string
+          requested_by?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+          executed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gps_commands_vehiculo_id_fkey"
+            columns: ["vehiculo_id"]
+            referencedRelation: "vehiculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gps_commands_driver_tercero_id_fkey"
+            columns: ["driver_tercero_id"]
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

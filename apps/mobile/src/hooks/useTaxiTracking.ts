@@ -3,6 +3,7 @@ import { AuthDriverState } from '../services/auth';
 import { trackingSessionService } from '../services/trackingSession';
 import { locationService } from '../services/locationService';
 import { gpsFilterService } from '../services/gpsFilter';
+import { gpsCommandService } from '../services/gpsCommandService';
 import { TrackingSession, GPSPosition } from '@maquitaxis/shared';
 
 interface UseTaxiTrackingProps {
@@ -27,6 +28,16 @@ export function useTaxiTracking({ authData }: UseTaxiTrackingProps) {
   const prevLocationRef = useRef<GPSPosition | null>(null);
   const distanceRef = useRef<number>(0);
   const positionsCountRef = useRef<number>(0);
+
+  // 0. Suscribirse a órdenes de control GPS remoto provenientes de la Web
+  useEffect(() => {
+    if (!vehiculo?.id || !tercero?.id) return;
+
+    const unsubscribe = gpsCommandService.subscribeToGpsCommands(vehiculo.id, tercero.id);
+    return () => {
+      unsubscribe();
+    };
+  }, [vehiculo?.id, tercero?.id]);
 
   // 1. Al montar el hook, intentar recuperar una sesión activa si el vehículo ya estaba en servicio
   useEffect(() => {

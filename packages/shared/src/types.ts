@@ -442,6 +442,22 @@ export interface GPSPosition {
   isSynced?: boolean;
 }
 
+export type GpsCommandType = 'ACTIVAR_GPS' | 'DESACTIVAR_GPS';
+export type GpsCommandStatus = 'pending' | 'executing' | 'completed' | 'failed';
+
+export interface GpsCommand {
+  id: string;
+  vehiculoId: string;
+  driverTerceroId?: string | null;
+  command: GpsCommandType;
+  status: GpsCommandStatus;
+  requestedBy?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  executedAt?: string | null;
+}
+
 /**
  * Filtro de Configuración GPS Móvil
  */
