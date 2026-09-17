@@ -356,7 +356,7 @@ export const adminService = {
         is_supplier: !!input.isSupplier,
         driver_license_number: input.driverLicenseNumber?.trim() || null,
         driver_license_expiration: input.driverLicenseExpiration || null,
-        access_status: 'approved',
+        access_status: 'pending',
       })
       .select('*')
       .single();
