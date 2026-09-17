@@ -8,6 +8,64 @@ import GpsMap from '../components/GpsMap';
 import { Search, RefreshCw, Radio, Car, ShieldAlert, CheckCircle2, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+/** Umbral técnico de obsolescencia GPS (3 minutos) */
+const STALE_THRESHOLD_MS = 3 * 60 * 1000;
+
+/** Helper nativo para formatear tiempo transcurrido */
+function formatTimeAgo(dateString: string | null): string {
+  if (!dateString) return 'sin fecha';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'fecha inválida';
+
+  const now = Date.now();
+  let diffMs = now - date.getTime();
+
+  // Caso de inconsistencia de reloj (timestamp futuro): no mostrar tiempos negativos
+  if (diffMs < 0) {
+    diffMs = 0;
+  }
+
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 60) {
+    return `hace ${diffSeconds} s`;
+  }
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `hace ${diffMinutes} min`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `hace ${diffHours} h`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return `hace ${diffDays} d`;
+}
+
+/** Helper para determinar el estado de actualidad GPS */
+function getGpsStatus(lat: number | null, lng: number | null, lastLocationAt: string | null) {
+  const hasCoords = lat != null && lng != null;
+  if (!hasCoords) {
+    return { state: 'SIN_COORDENADAS' as const, isStale: false, timeAgo: '' };
+  }
+  if (!lastLocationAt) {
+    return { state: 'OBSOLETO' as const, isStale: true, timeAgo: 'sin fecha' };
+  }
+
+  const date = new Date(lastLocationAt);
+  if (isNaN(date.getTime())) {
+    return { state: 'OBSOLETO' as const, isStale: true, timeAgo: 'fecha inválida' };
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const isStale = diffMs > STALE_THRESHOLD_MS;
+
+  return {
+    state: isStale ? ('OBSOLETO' as const) : ('EN_VIVO' as const),
+    isStale,
+    timeAgo: formatTimeAgo(lastLocationAt),
+  };
+}
+
 export const MonitoreoGpsPage: React.FC = () => {
   const { rol, servicio } = useAuth();
   const [vehicles, setVehicles] = useState<ActiveVehicleTracking[]>([]);
@@ -255,7 +313,7 @@ export const MonitoreoGpsPage: React.FC = () => {
             ) : (
               filteredVehicles.map((v) => {
                 const isSelected = v.vehiculoId === selectedVehicleId;
-                const hasCoords = v.lastKnownLat != null && v.lastKnownLng != null;
+                const gpsStatus = getGpsStatus(v.lastKnownLat, v.lastKnownLng, v.lastLocationAt);
 
                 return (
                   <div
@@ -326,8 +384,20 @@ export const MonitoreoGpsPage: React.FC = () => {
 
                     {/* Estado de Coordenadas GPS */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.7rem' }}>
-                      <span style={{ color: hasCoords ? '#10b981' : '#ef4444', fontWeight: 600 }}>
-                        {hasCoords ? '📍 Ubicación disponible' : '⚠️ Sin coordenadas GPS'}
+                      <span
+                        style={{
+                          color:
+                            gpsStatus.state === 'EN_VIVO'
+                              ? '#10b981'
+                              : gpsStatus.state === 'OBSOLETO'
+                              ? '#f59e0b'
+                              : '#ef4444',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {gpsStatus.state === 'EN_VIVO' && '📍 Ubicación en vivo'}
+                        {gpsStatus.state === 'OBSOLETO' && `⚠️ Ubicación desactualizada · ${gpsStatus.timeAgo}`}
+                        {gpsStatus.state === 'SIN_COORDENADAS' && '⚠️ Sin coordenadas GPS'}
                       </span>
                       {v.lastLocationAt && (
                         <span style={{ color: '#64748b' }}>
@@ -396,8 +466,35 @@ export const MonitoreoGpsPage: React.FC = () => {
                 <div>
                   <strong>Longitud:</strong> {selectedVehicle.lastKnownLng?.toFixed(6) ?? 'No disp.'}
                 </div>
+                {(() => {
+                  const selGpsStatus = getGpsStatus(
+                    selectedVehicle.lastKnownLat,
+                    selectedVehicle.lastKnownLng,
+                    selectedVehicle.lastLocationAt
+                  );
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                      <strong style={{ color: '#94a3b8' }}>Estado GPS:</strong>
+                      <span
+                        style={{
+                          color:
+                            selGpsStatus.state === 'EN_VIVO'
+                              ? '#10b981'
+                              : selGpsStatus.state === 'OBSOLETO'
+                              ? '#f59e0b'
+                              : '#ef4444',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {selGpsStatus.state === 'EN_VIVO' && '📍 En vivo'}
+                        {selGpsStatus.state === 'OBSOLETO' && `⚠️ Desactualizada (${selGpsStatus.timeAgo})`}
+                        {selGpsStatus.state === 'SIN_COORDENADAS' && '⚠️ Sin Coordenadas'}
+                      </span>
+                    </div>
+                  );
+                })()}
                 {selectedVehicle.lastLocationAt && (
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                     Última actualización: {new Date(selectedVehicle.lastLocationAt).toLocaleString()}
                   </div>
                 )}
