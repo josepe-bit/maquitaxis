@@ -83,6 +83,7 @@ export const MonitoreoGpsPage: React.FC = () => {
   const [isCommandSubmitting, setIsCommandSubmitting] = useState<boolean>(false);
   const [commandActionError, setCommandActionError] = useState<string | null>(null);
   const [commandTimerWarning, setCommandTimerWarning] = useState<boolean>(false);
+  const [showStopConfirmModal, setShowStopConfirmModal] = useState<boolean>(false);
 
   // Cargar lista de vehículos (Aislamiento Multiempresa para Nivel 2)
   const loadData = async () => {
@@ -123,12 +124,14 @@ export const MonitoreoGpsPage: React.FC = () => {
       setActiveCommand(null);
       setCommandActionError(null);
       setCommandTimerWarning(false);
+      setShowStopConfirmModal(false);
       return;
     }
 
     let isMounted = true;
     setCommandActionError(null);
     setCommandTimerWarning(false);
+    setShowStopConfirmModal(false);
 
     // 1. Consultar si existe un comando 'pending' o 'executing' previo
     webGpsCommandService
@@ -227,12 +230,6 @@ export const MonitoreoGpsPage: React.FC = () => {
     // B. Validar conductor asignado (driverId)
     if (!selectedVehicle.driverId) {
       setCommandActionError('Este vehículo no tiene un conductor asignado.');
-      return;
-    }
-
-    // C. Validar sesión activa si es ACTIVAR_GPS
-    if (commandType === 'ACTIVAR_GPS' && !selectedVehicle.activeSessionId) {
-      setCommandActionError('El conductor debe tener una sesión de seguimiento activa en la app móvil.');
       return;
     }
 
@@ -652,8 +649,131 @@ export const MonitoreoGpsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Estado del Conductor */}
-                {!selectedVehicle.driverId ? (
+                {/* 1. Bloque de Estado Principal del GPS */}
+                {(() => {
+                  const isOrderInProgress = activeCommand?.status === 'pending' || activeCommand?.status === 'executing';
+
+                  if (isOrderInProgress) {
+                    return (
+                      <div
+                        style={{
+                          padding: '0.625rem',
+                          borderRadius: '0.375rem',
+                          backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                          border: '1px solid #f59e0b',
+                          color: '#fcd34d',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontWeight: 700, fontSize: '0.8rem' }}>
+                          <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                          <span>🟡 ORDEN EN PROCESO</span>
+                        </div>
+                        <div style={{ fontSize: '0.725rem', color: '#fde68a' }}>
+                          {activeCommand.status === 'pending' && '⏳ Orden enviada. Esperando entrega al dispositivo...'}
+                          {activeCommand.status === 'executing' && '⏳ El dispositivo recibió la orden. Procesando...'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (selectedVehicle.activeSessionId) {
+                    return (
+                      <div
+                        style={{
+                          padding: '0.625rem',
+                          borderRadius: '0.375rem',
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          border: '1px solid #10b981',
+                          color: '#6ee7b7',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.15rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontWeight: 700, fontSize: '0.8rem' }}>
+                          <span>🟢 SERVICIO GPS ACTIVO</span>
+                        </div>
+                        <div style={{ fontSize: '0.725rem', color: '#a7f3d0' }}>
+                          Transmitiendo ubicación en tiempo real desde el móvil
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      style={{
+                        padding: '0.625rem',
+                        borderRadius: '0.375rem',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid #ef4444',
+                        color: '#fca5a5',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.15rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontWeight: 700, fontSize: '0.8rem' }}>
+                        <span>🔴 SERVICIO GPS DETENIDO</span>
+                      </div>
+                      <div style={{ fontSize: '0.725rem', color: '#fecdd3' }}>
+                        Sin transmisión activa desde el dispositivo
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Resultado / Notificación de Comando Finalizado o Error */}
+                {activeCommand && (activeCommand.status === 'completed' || activeCommand.status === 'failed') && (
+                  <div
+                    style={{
+                      padding: '0.5rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                      backgroundColor:
+                        activeCommand.status === 'completed'
+                          ? 'rgba(16, 185, 129, 0.15)'
+                          : 'rgba(239, 68, 68, 0.15)',
+                      border:
+                        activeCommand.status === 'completed'
+                          ? '1px solid #10b981'
+                          : '1px solid #ef4444',
+                      color:
+                        activeCommand.status === 'completed'
+                          ? '#6ee7b7'
+                          : '#fca5a5',
+                    }}
+                  >
+                    {activeCommand.status === 'completed' ? (
+                      <>
+                        <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                        <span>✅ Orden ejecutada correctamente</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert size={14} style={{ flexShrink: 0 }} />
+                        <span>❌ Error al ejecutar orden{activeCommand.errorMessage ? `: ${activeCommand.errorMessage}` : ''}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Advertencia de timeout si han pasado más de 15 segundos sin confirmación del móvil */}
+                {commandTimerWarning && activeCommand?.status === 'pending' && (
+                  <div style={{ fontSize: '0.7rem', color: '#fcd34d', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '0.375rem', borderRadius: '0.25rem', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                    ⚠️ El dispositivo aún no confirma la recepción. Puede estar sin señal o apagado.
+                  </div>
+                )}
+
+                {/* 3. Validación de Conductor Asignado */}
+                {!selectedVehicle.driverId && (
                   <div
                     style={{
                       padding: '0.5rem',
@@ -668,67 +788,11 @@ export const MonitoreoGpsPage: React.FC = () => {
                     }}
                   >
                     <AlertTriangle size={14} style={{ flexShrink: 0 }} />
-                    <span>⚠️ Sin conductor asignado</span>
-                  </div>
-                ) : null}
-
-                {/* Indicador visual de comando activo en progreso */}
-                {activeCommand && (
-                  <div
-                    style={{
-                      padding: '0.5rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.25rem',
-                      backgroundColor:
-                        activeCommand.status === 'completed'
-                          ? 'rgba(16, 185, 129, 0.15)'
-                          : activeCommand.status === 'failed'
-                          ? 'rgba(239, 68, 68, 0.15)'
-                          : 'rgba(56, 189, 248, 0.15)',
-                      border:
-                        activeCommand.status === 'completed'
-                          ? '1px solid #10b981'
-                          : activeCommand.status === 'failed'
-                          ? '1px solid #ef4444'
-                          : '1px solid #38bdf8',
-                      color:
-                        activeCommand.status === 'completed'
-                          ? '#6ee7b7'
-                          : activeCommand.status === 'failed'
-                          ? '#fca5a5'
-                          : '#7dd3fc',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                      {activeCommand.status === 'pending' || activeCommand.status === 'executing' ? (
-                        <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                      ) : activeCommand.status === 'completed' ? (
-                        <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
-                      ) : (
-                        <ShieldAlert size={14} style={{ flexShrink: 0 }} />
-                      )}
-
-                      <span>
-                        {activeCommand.status === 'pending' && '⏳ Comando pendiente de entrega al dispositivo...'}
-                        {activeCommand.status === 'executing' && '⏳ Comando recibido. Ejecutando en el dispositivo...'}
-                        {activeCommand.status === 'completed' && '✅ Comando ejecutado correctamente'}
-                        {activeCommand.status === 'failed' && `❌ No fue posible ejecutar el comando${activeCommand.errorMessage ? `: ${activeCommand.errorMessage}` : ''}`}
-                      </span>
-                    </div>
-
-                    {commandTimerWarning && activeCommand.status === 'pending' && (
-                      <div style={{ fontSize: '0.7rem', color: '#fcd34d', marginTop: '0.15rem' }}>
-                        ⚠️ El dispositivo aún no confirma la recepción.
-                      </div>
-                    )}
+                    <span>⚠️ Sin conductor asignado para recibir órdenes</span>
                   </div>
                 )}
 
-                {/* Botón de Control Remoto según estado del vehículo */}
+                {/* 4. Botones de Acción de Control Remoto */}
                 {(() => {
                   const hasDriver = Boolean(selectedVehicle.driverId);
                   const hasActiveSession = Boolean(selectedVehicle.activeSessionId);
@@ -740,38 +804,8 @@ export const MonitoreoGpsPage: React.FC = () => {
 
                   if (!hasActiveSession) {
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                        <button
-                          disabled={true}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            padding: '0.5rem 0.75rem',
-                            backgroundColor: '#334155',
-                            color: '#64748b',
-                            border: '1px solid #475569',
-                            borderRadius: '0.375rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            cursor: 'not-allowed',
-                            width: '100%',
-                          }}
-                        >
-                          🟢 Activar GPS
-                        </button>
-                        <div style={{ fontSize: '0.7rem', color: '#f59e0b', lineHeight: 1.3 }}>
-                          ⚠️ El conductor debe tener una sesión de seguimiento activa en la app móvil.
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
                       <button
-                        onClick={() => handleSendGpsCommand('DESACTIVAR_GPS')}
+                        onClick={() => handleSendGpsCommand('ACTIVAR_GPS')}
                         disabled={isBusy}
                         style={{
                           display: 'flex',
@@ -779,7 +813,7 @@ export const MonitoreoGpsPage: React.FC = () => {
                           justifyContent: 'center',
                           gap: '0.5rem',
                           padding: '0.5rem 0.75rem',
-                          backgroundColor: isBusy ? '#475569' : '#dc2626',
+                          backgroundColor: isBusy ? '#475569' : '#10b981',
                           color: '#ffffff',
                           border: 'none',
                           borderRadius: '0.375rem',
@@ -797,13 +831,148 @@ export const MonitoreoGpsPage: React.FC = () => {
                           </>
                         ) : (
                           <>
-                            <span>🔴 Desactivar GPS</span>
+                            <span>🟢 INICIAR SERVICIO GPS</span>
                           </>
                         )}
                       </button>
-                    </div>
+                    );
+                  }
+
+                  return (
+                    <button
+                      onClick={() => setShowStopConfirmModal(true)}
+                      disabled={isBusy}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.75rem',
+                        backgroundColor: isBusy ? '#475569' : '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: isBusy ? 'not-allowed' : 'pointer',
+                        width: '100%',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                    >
+                      {isBusy ? (
+                        <>
+                          <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Procesando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🔴 DETENER SERVICIO GPS</span>
+                        </>
+                      )}
+                    </button>
                   );
                 })()}
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Confirmación antes de Detener Servicio GPS */}
+          {showStopConfirmModal && selectedVehicle && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(4px)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #ef4444',
+                  borderRadius: '0.75rem',
+                  padding: '1.5rem',
+                  maxWidth: '420px',
+                  width: '100%',
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444' }}>
+                  <AlertTriangle size={24} />
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc' }}>
+                    Confirmar Detención de Servicio GPS
+                  </h3>
+                </div>
+
+                <p style={{ margin: 0, fontSize: '0.875rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                  ¿Está seguro de que desea detener el servicio GPS del vehículo <strong>Taxi {selectedVehicle.plate}</strong>?
+                </p>
+
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderLeft: '4px solid #ef4444',
+                    borderRadius: '0.25rem',
+                    fontSize: '0.75rem',
+                    color: '#fca5a5',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  ⚠️ El dispositivo móvil del conductor dejará de transmitir su ubicación en tiempo real.
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setShowStopConfirmModal(false)}
+                    disabled={isCommandSubmitting}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#334155',
+                      color: '#f8fafc',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowStopConfirmModal(false);
+                      await handleSendGpsCommand('DESACTIVAR_GPS');
+                    }}
+                    disabled={isCommandSubmitting}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                    }}
+                  >
+                    Detener GPS
+                  </button>
+                </div>
               </div>
             </div>
           )}
