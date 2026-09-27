@@ -60,6 +60,7 @@ export const DashboardPage: React.FC = () => {
       })
       .catch((err) => {
         console.error('Error cargando filtros:', err);
+        setErrorMessage(err.message || 'No se pudieron cargar los filtros del dashboard');
       });
   }, [rol, servicio?.id]);
 
@@ -81,6 +82,7 @@ export const DashboardPage: React.FC = () => {
       setSummary(data);
     } catch (err: any) {
       console.error('Error al cargar datos del dashboard:', err);
+      setSummary(null);
       setErrorMessage(err.message || 'No se pudieron calcular los indicadores del dashboard');
     } finally {
       setIsLoading(false);
@@ -297,6 +299,74 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Mensaje de Error de Carga / Consulta */}
+      {errorMessage && (
+        <div
+          style={{
+            padding: '1rem 1.25rem',
+            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid #ef4444',
+            borderRadius: '8px',
+            color: '#fca5a5',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertCircle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
+            <div>
+              <strong style={{ display: 'block', color: '#f87171' }}>Error al actualizar el resumen financiero</strong>
+              <span>{errorMessage}</span>
+            </div>
+          </div>
+          <button
+            onClick={loadSummaryData}
+            disabled={isLoading}
+            style={{
+              padding: '0.45rem 0.9rem',
+              backgroundColor: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              cursor: isLoading ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <RefreshCw size={14} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
+            <span>Reintentar</span>
+          </button>
+        </div>
+      )}
+
+      {/* Indicador de Carga Inicial o mientras se actualizan datos sin datos previos */}
+      {isLoading && !summary && !errorMessage && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '3rem',
+            backgroundColor: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '12px',
+            gap: '1rem',
+            color: '#94a3b8',
+          }}
+        >
+          <RefreshCw size={28} style={{ animation: 'spin 1s linear infinite', color: '#f59e0b' }} />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cargando resumen financiero...</span>
+        </div>
+      )}
 
       {/* Alertas / Inconsistencias Matemáticas (si las hubiere) */}
       {!isMathValid && (
