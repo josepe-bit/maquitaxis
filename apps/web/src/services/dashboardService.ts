@@ -317,9 +317,12 @@ export async function getDashboardFinancialSummary(
   // - Conductor: liquidacion.tercero_id (Directo, a quién se liquida)
   // - Vehículo: N/A (La tabla liquidacion no posee vehiculo_id)
   // - Evento: N/A (Liquidación no tiene relación con eventos)
+  // REGLA CONTABLE: Excluir 'devolucion_ahorro'. El ahorro personal del conductor
+  // es dinero propio devuelto en custodia; no es costo ni gasto operativo del taxi.
   let liquidacionQuery = supabase
     .from('liquidacion')
-    .select('id, payment_date, tercero_id, amount')
+    .select('id, payment_date, tercero_id, amount, concept')
+    .neq('concept', 'devolucion_ahorro')
     .gte('payment_date', startDate)
     .lte('payment_date', endDate);
 
@@ -340,7 +343,44 @@ export async function getDashboardFinancialSummary(
   const { data: liquidaciones, error: liquidacionError } = await liquidacionQuery;
   if (liquidacionError) throw liquidacionError;
 
-  // 5. Agrupar por meses (0 a 11)
+  const financialTotals = aggregateFinancialRecords(
+    producciones || [],
+    controles || [],
+    mantenimientos || [],
+    liquidaciones || []
+  );
+
+  return {
+    year,
+    selectedVehiculoId: vehiculoId,
+    selectedDriverId: driverId,
+    selectedEventoId: eventoId,
+    ...financialTotals,
+    totalMantenimientosCount: (mantenimientos || []).length,
+    totalProduccionesCount: (producciones || []).length,
+  };
+}
+
+/**
+ * Agrupa y calcula los registros financieros mensuales garantizando que el ahorro
+ * personal del conductor quede 100% excluido de los ingresos, egresos y neto del taxi.
+ */
+export function aggregateFinancialRecords(
+  producciones: any[],
+  controles: any[],
+  mantenimientos: any[],
+  liquidaciones: any[]
+): {
+  monthlyData: MonthlyFinancialRecord[];
+  totalIngresos: number;
+  totalControl: number;
+  totalMantenimiento: number;
+  totalLiquidacion: number;
+  totalGastos: number;
+  totalNeto: number;
+  rentabilidadTotal: number | null;
+  eventBreakdown: EventControlBreakdown[];
+} {
   const monthlyIngresos = new Array(12).fill(0);
   const monthlyControl = new Array(12).fill(0);
   const monthlyMantenimiento = new Array(12).fill(0);
@@ -349,9 +389,14 @@ export async function getDashboardFinancialSummary(
   // Mapa para el desglose de eventos de control
   const eventMap = new Map<string, { name: string; values: number[] }>();
 
-  // Procesar Producción
+  // 1. Procesar Producción (Cuota del taxi como ingreso exclusivo del vehículo)
+  // REGLA: El ahorro personal del conductor (savings_amount) NO debe sumarse al ingreso.
+  // La cuota del taxi (amount) se conserva como producido del taxi menos deducciones.
   (producciones || []).forEach((p: any) => {
     if (p.date) {
+      if (p.status && p.status !== 'trabajo') {
+        return;
+      }
       const month = new Date(p.date + 'T00:00:00').getMonth();
       if (month >= 0 && month < 12) {
         const netProd = Number(p.amount || 0) - Number(p.deduction || 0);
@@ -360,7 +405,7 @@ export async function getDashboardFinancialSummary(
     }
   });
 
-  // Procesar Control
+  // 2. Procesar Control
   (controles || []).forEach((c: any) => {
     if (c.date) {
       const month = new Date(c.date + 'T00:00:00').getMonth();
@@ -379,7 +424,7 @@ export async function getDashboardFinancialSummary(
     }
   });
 
-  // Procesar Mantenimiento
+  // 3. Procesar Mantenimiento
   (mantenimientos || []).forEach((m: any) => {
     if (m.date) {
       const month = new Date(m.date + 'T00:00:00').getMonth();
@@ -389,9 +434,15 @@ export async function getDashboardFinancialSummary(
     }
   });
 
-  // Procesar Liquidación
+  // 4. Procesar Liquidación (Costos y prestaciones laborales atribuibles a la operación del taxi)
+  // REGLA OBLIGATORIA: Excluir estrictamente 'devolucion_ahorro'.
+  // La devolución del ahorro del conductor es la restitución de sus propios fondos en custodia,
+  // NO es costo operativo del taxi, NO debe sumarse a egresos y NO debe restarse del neto.
   (liquidaciones || []).forEach((l: any) => {
     if (l.payment_date) {
+      if (l.concept === 'devolucion_ahorro') {
+        return;
+      }
       const month = new Date(l.payment_date + 'T00:00:00').getMonth();
       if (month >= 0 && month < 12) {
         monthlyLiquidacion[month] += Number(l.amount || 0);
@@ -399,7 +450,7 @@ export async function getDashboardFinancialSummary(
     }
   });
 
-  // Construir registros mensuales y totales
+  // 5. Construir registros mensuales y totales
   let totalIngresos = 0;
   let totalControl = 0;
   let totalMantenimiento = 0;
@@ -452,10 +503,7 @@ export async function getDashboardFinancialSummary(
   });
 
   return {
-    year,
-    selectedVehiculoId: vehiculoId,
-    selectedDriverId: driverId,
-    selectedEventoId: eventoId,
+    monthlyData,
     totalIngresos,
     totalControl,
     totalMantenimiento,
@@ -463,9 +511,6 @@ export async function getDashboardFinancialSummary(
     totalGastos,
     totalNeto,
     rentabilidadTotal,
-    monthlyData,
     eventBreakdown,
-    totalMantenimientosCount: (mantenimientos || []).length,
-    totalProduccionesCount: (producciones || []).length,
   };
 }

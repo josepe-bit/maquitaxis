@@ -439,7 +439,7 @@ export const DashboardPage: React.FC = () => {
             <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#a855f7', margin: '0.5rem 0 0 0' }}>
               {formatCurrency(summary.totalLiquidacion)}
             </p>
-            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Pagos de prestaciones/ahorro</span>
+            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Pagos de prestaciones sociales</span>
           </div>
 
           {/* Total Gastos */}
