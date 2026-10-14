@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ahorroConductorService,
   DriverSavingsSummary,
@@ -38,14 +38,14 @@ export const DevolucionAhorroPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Filtros de bÃºsqueda
+  // Filtros de búsqueda
   const [selectedDriverFilter, setSelectedDriverFilter] = useState<string>('');
   const [startDateFilter, setStartDateFilter] = useState<string>('');
   const [endDateFilter, setEndDateFilter] = useState<string>('');
   const [periodFromFilter, setPeriodFromFilter] = useState<string>('');
   const [periodToFilter, setPeriodToFilter] = useState<string>('');
 
-  // Modal Registrar DevoluciÃ³n
+  // Modal Registrar Devolución
   const [showModal, setShowModal] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -101,7 +101,7 @@ export const DevolucionAhorroPage: React.FC = () => {
     }
   };
 
-  // Abrir Modal de Registro con Clave de Idempotencia Ãšnica por SesiÃ³n
+  // Abrir Modal de Registro con Clave de Idempotencia Única por Sesión
   const handleOpenCreateModal = () => {
     const nowStr = new Date().toISOString().split('T')[0];
     setFormPaymentDate(nowStr);
@@ -112,11 +112,11 @@ export const DevolucionAhorroPage: React.FC = () => {
     setFormFromDate(firstDayMonth.toISOString().split('T')[0]);
     setFormToDate(nowStr);
 
-    setFormDetail('DevoluciÃ³n de ahorro acumulado del conductor');
+    setFormDetail('Devolución de ahorro acumulado del conductor');
     setFormAmount('');
     setFormError(null);
 
-    // Generar clave de idempotencia UUID v4 Ãºnica para prevenir desembolsos duplicados
+    // Generar clave de idempotencia UUID v4 única para prevenir desembolsos duplicados
     const newIdempKey =
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
@@ -168,12 +168,12 @@ export const DevolucionAhorroPage: React.FC = () => {
     fetchDriverBalance(driverId);
   };
 
-  // Guardar DevoluciÃ³n con PrevenciÃ³n Estricta de Doble EnvÃ­o e Idempotencia
+  // Guardar Devolución con Prevención Estricta de Doble Envío e Idempotencia
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    if (saving) return; // PrevenciÃ³n de doble clic
+    if (saving) return; // Prevención de doble clic
 
     // Validaciones
     if (!formDriverId) {
@@ -181,7 +181,7 @@ export const DevolucionAhorroPage: React.FC = () => {
       return;
     }
     if (!formPaymentDate) {
-      setFormError('La fecha de devoluciÃ³n es obligatoria.');
+      setFormError('La fecha de devolución es obligatoria.');
       return;
     }
     if (!formFromDate || !formToDate) {
@@ -197,7 +197,7 @@ export const DevolucionAhorroPage: React.FC = () => {
       return;
     }
     if (!formDetail || formDetail.trim() === '') {
-      setFormError('Por favor especifica el detalle o motivo de la devoluciÃ³n.');
+      setFormError('Por favor especifica el detalle o motivo de la devolución.');
       return;
     }
 
@@ -241,7 +241,7 @@ export const DevolucionAhorroPage: React.FC = () => {
 
       setFeedback({
         type: 'success',
-        message: `Â¡DevoluciÃ³n de ahorro registrada con Ã©xito! Se devolvieron ${formatCurrency(
+        message: `¡Devolución de ahorro registrada con éxito! Se devolvieron ${formatCurrency(
           result.returnedAmount
         )} a ${result.driverName}. Nuevo saldo disponible: ${formatCurrency(result.newAvailableBalance)}.`,
       });
@@ -249,7 +249,7 @@ export const DevolucionAhorroPage: React.FC = () => {
       setShowModal(false);
       await loadDevoluciones();
     } catch (err: any) {
-      setFormError(err.message || 'Error al guardar la devoluciÃ³n de ahorro.');
+      setFormError(err.message || 'Error al guardar la devolución de ahorro.');
     } finally {
       setSaving(false);
     }
@@ -272,7 +272,7 @@ export const DevolucionAhorroPage: React.FC = () => {
     return Math.floor(diffTime / (1000 * 3600 * 24)) + 1;
   };
 
-  // MÃ©tricas Consolidadas
+  // Métricas Consolidadas
   const totalDevolucionesEntregadas = devoluciones.reduce((acc, d) => acc + d.amount, 0);
   const uniqueDriversCount = new Set(devoluciones.map((d) => d.driverId)).size;
 
@@ -310,10 +310,10 @@ export const DevolucionAhorroPage: React.FC = () => {
             }}
           >
             <PiggyBank size={28} color="#38bdf8" />
-            <span>DevoluciÃ³n de Ahorro del Conductor</span>
+            <span>Devolución de Ahorro del Conductor</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
-            MÃ³dulo independiente para registrar y consultar las devoluciones de ahorro acumulado de los conductores.
+            Módulo independiente para registrar y consultar las devoluciones de ahorro acumulado de los conductores.
           </p>
         </div>
 
@@ -337,7 +337,7 @@ export const DevolucionAhorroPage: React.FC = () => {
             }}
           >
             <Plus size={18} />
-            <span>Registrar DevoluciÃ³n de Ahorro</span>
+            <span>Registrar Devolución de Ahorro</span>
           </button>
         )}
       </div>
@@ -359,7 +359,7 @@ export const DevolucionAhorroPage: React.FC = () => {
       >
         <ShieldCheck size={20} color="#38bdf8" style={{ flexShrink: 0 }} />
         <div>
-          <strong style={{ color: '#38bdf8' }}>Regla de Negocio Contable:</strong> Las devoluciones de ahorro residen en su persistencia especializada (<code>public.devoluciones_ahorro_conductor</code>). No alteran el cÃ¡lculo del producido neto del taxi, no se contabilizan como gasto operativo ni ingreso, y se mantienen completamente separadas de las prestaciones sociales.
+          <strong style={{ color: '#38bdf8' }}>Regla de Negocio Contable:</strong> Las devoluciones de ahorro residen en su persistencia especializada (<code>public.devoluciones_ahorro_conductor</code>). No alteran el cálculo del producido neto del taxi, no se contabilizan como gasto operativo ni ingreso, y se mantienen completamente separadas de las prestaciones sociales.
         </div>
       </div>
 
@@ -390,7 +390,7 @@ export const DevolucionAhorroPage: React.FC = () => {
         </div>
       )}
 
-      {/* MÃ©tricas Consolidadas */}
+      {/* Métricas Consolidadas */}
       <div
         style={{
           display: 'grid',
@@ -547,7 +547,7 @@ export const DevolucionAhorroPage: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Fecha DevoluciÃ³n Desde
+              Fecha Devolución Desde
             </label>
             <input
               type="date"
@@ -568,7 +568,7 @@ export const DevolucionAhorroPage: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Fecha DevoluciÃ³n Hasta
+              Fecha Devolución Hasta
             </label>
             <input
               type="date"
@@ -620,7 +620,7 @@ export const DevolucionAhorroPage: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontWeight: '700' }}>Fecha DevoluciÃ³n</th>
+                <th style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontWeight: '700' }}>Fecha Devolución</th>
                 <th style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontWeight: '700' }}>Conductor</th>
                 <th style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontWeight: '700' }}>Periodo Ahorro Devuelto</th>
                 <th style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontWeight: '700' }}>Detalle / Motivo</th>
@@ -677,10 +677,10 @@ export const DevolucionAhorroPage: React.FC = () => {
 
                       <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
                         <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>
-                          {d.fromDate} <span style={{ color: 'var(--text-secondary)' }}>â†’</span> {d.toDate}
+                          {d.fromDate} <span style={{ color: 'var(--text-secondary)' }}>→</span> {d.toDate}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {diasPeriodo} dÃ­as cubiertos
+                          {diasPeriodo} días cubiertos
                         </div>
                       </td>
 
@@ -715,7 +715,7 @@ export const DevolucionAhorroPage: React.FC = () => {
                                 width: 'fit-content',
                               }}
                             >
-                              HistÃ³rico (LiquidaciÃ³n)
+                              Histórico (Liquidación)
                             </span>
                           ) : (
                             <span
@@ -746,7 +746,7 @@ export const DevolucionAhorroPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Registrar DevoluciÃ³n de Ahorro */}
+      {/* Modal Registrar Devolución de Ahorro */}
       {showModal && (
         <div
           style={{
@@ -798,7 +798,7 @@ export const DevolucionAhorroPage: React.FC = () => {
                 }}
               >
                 <PiggyBank size={22} color="#38bdf8" />
-                <span>Registrar DevoluciÃ³n de Ahorro</span>
+                <span>Registrar Devolución de Ahorro</span>
               </h2>
               <button
                 type="button"
@@ -936,11 +936,11 @@ export const DevolucionAhorroPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 2. Fecha de devoluciÃ³n y Valor pagado */}
+                {/* 2. Fecha de devolución y Valor pagado */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                      Fecha DevoluciÃ³n *
+                      Fecha Devolución *
                     </label>
                     <input
                       type="date"
@@ -1034,17 +1034,17 @@ export const DevolucionAhorroPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 4. Detalle de DevoluciÃ³n */}
+                {/* 4. Detalle de Devolución */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                    Detalle / Motivo de DevoluciÃ³n *
+                    Detalle / Motivo de Devolución *
                   </label>
                   <textarea
                     required
                     rows={2}
                     value={formDetail}
                     onChange={(e) => setFormDetail(e.target.value)}
-                    placeholder="DescripciÃ³n de la entrega de fondos acumulados al conductor..."
+                    placeholder="Descripción de la entrega de fondos acumulados al conductor..."
                     style={{
                       width: '100%',
                       padding: '0.65rem 0.85rem',
@@ -1060,7 +1060,7 @@ export const DevolucionAhorroPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Botones de AcciÃ³n */}
+              {/* Botones de Acción */}
               <div
                 style={{
                   display: 'flex',
@@ -1104,7 +1104,7 @@ export const DevolucionAhorroPage: React.FC = () => {
                   }}
                 >
                   {saving && <RefreshCw size={16} className="animate-spin" />}
-                  <span>{saving ? 'Guardando...' : 'Confirmar DevoluciÃ³n'}</span>
+                  <span>{saving ? 'Guardando...' : 'Confirmar Devolución'}</span>
                 </button>
               </div>
             </form>
