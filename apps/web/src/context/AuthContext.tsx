@@ -118,6 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             'MANTENIMIENTO',
             'SSOCIAL',
             'LIQUIDACION',
+            'DEVOLUCION_AHORRO',
             'TERCEROS',
             'PRODUCCION',
             'HISTORY_ROUTES',
@@ -135,7 +136,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'NIVEL_2':
         return {
           canAccessAll: false,
-          allowedTabs: ['VEHICULOS', 'MONITOREO_GPS', 'DASHBOARD', 'EVENTOS', 'CONTROL', 'MANTENIMIENTO', 'SSOCIAL', 'LIQUIDACION', 'PRODUCCION'],
+          allowedTabs: ['VEHICULOS', 'MONITOREO_GPS', 'DASHBOARD', 'EVENTOS', 'CONTROL', 'MANTENIMIENTO', 'SSOCIAL', 'LIQUIDACION', 'DEVOLUCION_AHORRO', 'PRODUCCION'],
           canManageVehiculos: true,
           canManageTerceros: false,
           canManageServicios: false,

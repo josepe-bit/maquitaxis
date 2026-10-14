@@ -659,6 +659,64 @@ export interface Database {
           }
         ]
       }
+      devoluciones_ahorro_conductor: {
+        Row: {
+          id: string
+          driver_id: string
+          payment_date: string
+          from_date: string
+          to_date: string
+          detail: string
+          amount: number
+          servicio_id: string | null
+          idempotency_key: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          driver_id: string
+          payment_date?: string
+          from_date: string
+          to_date: string
+          detail: string
+          amount: number
+          servicio_id?: string | null
+          idempotency_key: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          driver_id?: string
+          payment_date?: string
+          from_date?: string
+          to_date?: string
+          detail?: string
+          amount?: number
+          servicio_id?: string | null
+          idempotency_key?: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devoluciones_ahorro_conductor_driver_id_fkey"
+            columns: ["driver_id"]
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devoluciones_ahorro_conductor_servicio_id_fkey"
+            columns: ["servicio_id"]
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       tracking_sessions: {
         Row: {
           id: string
@@ -956,6 +1014,25 @@ export interface Database {
           p_driver_id: string
           p_amount: number
           p_notes?: string | null
+        }
+        Returns: Json
+      }
+      register_driver_savings_return_v2: {
+        Args: {
+          p_driver_id: string
+          p_amount: number
+          p_payment_date: string
+          p_from_date: string
+          p_to_date: string
+          p_detail: string
+          p_idempotency_key: string
+          p_servicio_id?: string | null
+        }
+        Returns: Json
+      }
+      reconcile_driver_savings_return: {
+        Args: {
+          p_idempotency_key: string
         }
         Returns: Json
       }

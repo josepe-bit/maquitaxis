@@ -23,6 +23,8 @@ import {
   Calendar,
   ChevronDown,
   Menu,
+  PiggyBank,
+  Briefcase,
 } from 'lucide-react';
 import { TaxiMap } from './components/TaxiMap';
 import { realtimeService } from './services/realtime';
@@ -39,6 +41,7 @@ import { ControlManagementPage } from './pages/ControlManagementPage';
 import { MantenimientoVehiculoPage } from './pages/MantenimientoVehiculoPage';
 import { SSocialManagementPage } from './pages/SSocialManagementPage';
 import { LiquidacionConductorPage } from './pages/LiquidacionConductorPage';
+import { DevolucionAhorroPage } from './pages/DevolucionAhorroPage';
 import { MonitoreoGpsPage } from './pages/MonitoreoGpsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -58,6 +61,7 @@ type ActiveWebTab =
   | 'MANTENIMIENTO'
   | 'SSOCIAL'
   | 'LIQUIDACION'
+  | 'DEVOLUCION_AHORRO'
   | 'TERCEROS'
   | 'PRODUCCION'
   | 'HISTORY_ROUTES';
@@ -102,7 +106,8 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { key: 'DASHBOARD', label: 'Dashboard Gerencial', icon: <DollarSign size={16} /> },
       { key: 'PRODUCCION', label: 'Producción Diaria', icon: <DollarSign size={16} /> },
-      { key: 'LIQUIDACION', label: 'Liquidación Conductor', icon: <DollarSign size={16} /> },
+      { key: 'DEVOLUCION_AHORRO', label: 'Devolución Ahorro Conductor', icon: <PiggyBank size={16} /> },
+      { key: 'LIQUIDACION', label: 'Liquidación Conductor (Prestaciones)', icon: <Briefcase size={16} /> },
       { key: 'SSOCIAL', label: 'Seguridad Social', icon: <ShieldCheck size={16} /> },
     ],
   },
@@ -1027,8 +1032,13 @@ const MainContentLayout: React.FC = () => {
           {activeTab === 'MANTENIMIENTO' && <MantenimientoVehiculoPage />}
           {activeTab === 'SSOCIAL' && <SSocialManagementPage />}
           {activeTab === 'LIQUIDACION' && <LiquidacionConductorPage />}
+          {activeTab === 'DEVOLUCION_AHORRO' && <DevolucionAhorroPage />}
           {activeTab === 'TERCEROS' && <TercerosManagementPage />}
-          {activeTab === 'PRODUCCION' && <ProduccionAdminPage />}
+          {activeTab === 'PRODUCCION' && (
+            <ProduccionAdminPage
+              onNavigateToDevolucionAhorro={() => setActiveTab('DEVOLUCION_AHORRO')}
+            />
+          )}
           {activeTab === 'HISTORY_ROUTES' && <HistoryRoutesPage />}
 
         </div>

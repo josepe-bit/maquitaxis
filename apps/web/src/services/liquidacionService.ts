@@ -28,6 +28,7 @@ export const liquidacionService = {
           email
         )
       `)
+      .neq('concept', 'devolucion_ahorro')
       .order('payment_date', { ascending: false });
 
     if (driverId && driverId.trim() !== '') {
@@ -149,7 +150,7 @@ export const liquidacionService = {
         to_date: input.toDate,
         detail: input.detail,
         amount: input.amount,
-        concept: input.concept || 'prestaciones_sociales',
+        concept: input.concept && input.concept !== 'devolucion_ahorro' ? input.concept : 'prestaciones_sociales',
       })
       .select()
       .single();

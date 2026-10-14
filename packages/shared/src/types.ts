@@ -412,6 +412,38 @@ export interface UpdateLiquidacionInput extends Partial<CreateLiquidacionInput> 
 
 
 /**
+ * Devolución de Ahorro del Conductor (Persistencia Independiente)
+ */
+export interface DevolucionAhorroConductor {
+  id: string;
+  driverId: string;
+  paymentDate: string;
+  fromDate: string;
+  toDate: string;
+  detail: string;
+  amount: number;
+  servicioId?: string | null;
+  idempotencyKey?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  isHistoric?: boolean;
+  driver?: Tercero;
+}
+
+export interface CreateDevolucionAhorroInput {
+  driverId: string;
+  paymentDate: string;
+  fromDate: string;
+  toDate: string;
+  detail: string;
+  amount: number;
+  servicioId?: string | null;
+  idempotencyKey?: string;
+}
+
+
+/**
  * Sesión de Seguimiento GPS
  */
 export interface TrackingSession {

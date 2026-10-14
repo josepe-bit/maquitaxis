@@ -5,6 +5,7 @@ import {
   UpdateProduccionInput,
 } from '../services/produccionService';
 import { liquidacionService } from '../services/liquidacionService';
+import { ahorroConductorService } from '../services/ahorroConductorService';
 import {
   ProduccionDiaria,
   Vehiculo,
@@ -31,7 +32,11 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
-export const ProduccionAdminPage: React.FC = () => {
+interface ProduccionAdminPageProps {
+  onNavigateToDevolucionAhorro?: () => void;
+}
+
+export const ProduccionAdminPage: React.FC<ProduccionAdminPageProps> = ({ onNavigateToDevolucionAhorro }) => {
   const { tercero, rol, servicio } = useAuth();
   const targetServicioId = rol === 'NIVEL_2' ? servicio?.id ?? null : null;
 
@@ -290,8 +295,12 @@ export const ProduccionAdminPage: React.FC = () => {
     }
   };
 
-  // Abrir Modal de Devolución de Ahorros por Conductor
+  // Abrir Modal de Devolución de Ahorros por Conductor (o redirigir a vista independiente)
   const handleOpenSavingsModal = () => {
+    if (onNavigateToDevolucionAhorro) {
+      onNavigateToDevolucionAhorro();
+      return;
+    }
     const defaultDriverId = drivers.length > 0 ? drivers[0].id : '';
     setSavingsDriverId(defaultDriverId);
     setDriverSummary(null);
@@ -312,7 +321,7 @@ export const ProduccionAdminPage: React.FC = () => {
     setCalculatingSavings(true);
     setSavingsError(null);
     try {
-      const summary = await produccionService.getDriverSavingsSummary(driverId);
+      const summary = await ahorroConductorService.getDriverSavingsSummary(driverId);
       setDriverSummary(summary);
       setSavingsAmountInput(summary.availableBalance > 0 ? summary.availableBalance.toString() : '0');
     } catch (err: any) {
@@ -322,7 +331,7 @@ export const ProduccionAdminPage: React.FC = () => {
     }
   };
 
-  // Procesar Registro Atómico de Devolución de Ahorro
+  // Procesar Registro Atómico de Devolución de Ahorro en Persistencia Independiente
   const handleConfirmLiquidacionAhorro = async () => {
     if (!savingsDriverId || !driverSummary) {
       setSavingsError('Por favor selecciona un conductor.');
@@ -346,11 +355,16 @@ export const ProduccionAdminPage: React.FC = () => {
     setLiquidating(true);
     setSavingsError(null);
     try {
-      const res = await produccionService.registerDriverSavingsReturn(
-        savingsDriverId,
-        amtToReturn,
-        savingsNotes
-      );
+      const todayStr = new Date().toISOString().split('T')[0];
+      const res = await ahorroConductorService.registerDriverSavingsReturn({
+        driverId: savingsDriverId,
+        amount: amtToReturn,
+        paymentDate: todayStr,
+        fromDate: todayStr,
+        toDate: todayStr,
+        detail: savingsNotes || 'Devolución de Ahorro Acumulado del Conductor',
+        servicioId: targetServicioId,
+      });
 
       setFeedback({
         type: 'success',
